@@ -63,3 +63,9 @@ Note:
 1. Use arduino.cc <a href="https://www.arduino.cc/en/Tutorial/Midi">MIDI Tutorial</a>
 
 <img src="https://www.arduino.cc/en/uploads/Tutorial/MIDI_schem.png" />
+
+## Hacked up result
+
+It's working!
+
+<img src="https://github.com/ramalhais/code/raw/master/arduino/sketchbook/midifoot/midifoot-hack.jpg" />
