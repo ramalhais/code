@@ -19,7 +19,7 @@ I'm using an <a href="https://www.arduino.cc/en/Main/ArduinoBoardNano">Arduino N
 
 Right now i'm powering it with a phone charger, but plan to power it from the MIDI port on my Randall RM100 guitar amplifier.
 
-Any MIDI Out ports should put out power on pins 1 and 3.
+Any MIDI In port should put out power on pins 1 and 3.
 
 Randall RM100 sends phantom power on ports 6 and 7. It also has some DIP switches inside the amp that enables phantom power on pins 1 and/or 3:
 <img src="http://i42.photobucket.com/albums/e311/Soulinsane/RM100F-Board.jpg" />
