@@ -1,3 +1,5 @@
+// 
+
 // MIDI jack pin 5 connected to Digital pin 1 (TX) through a 220 ohm resistor
 // MIDI jack pin 2 connected to ground
 // MIDI jack pin 4 connected to +5V through a 220 ohm resistor
@@ -13,13 +15,13 @@ int buttonPin[] = {2, 3, 4, 5};
 
 // Randall RM100 sends 9VAC on pins 7 and 3 (DIP Switch S2-2) and on pins 6 and 1 (DIP Switch S2-1)
 
-// Randall Control Change Channels
+// Randall Control Change Channel 1
 #define RANDALL_CC_CH1 56
 #define RANDALL_CC_CV 127
 #define RANDALL_MIDI_CH_RM100 16 // DIP Switches S1 4 to 1 set to OFF (mine was on CH1 with all DIP switches ON)
 #define RANDALL_MIDI_CH_RM4 1
 #define RANDALL_MIDI_CH_RT250 16
-#define RANDALL_MIDI_CH_DEFAULT RANDALL_MIDI_CH_RM4
+#define RANDALL_MIDI_CH_DEFAULT RANDALL_MIDI_CH_RM4 // Set your channel here
 
 #define MIDI_MODE_CC 1
 #define MIDI_MODE_PC 2
@@ -75,6 +77,7 @@ void loop() {
     if (pinVal[i] != pinValNew) {
       pinVal[i] = pinValNew;
       buttonToMIDI(i+1);
+      delay(500);
       break;
     }
   }
