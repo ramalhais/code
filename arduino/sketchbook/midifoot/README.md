@@ -8,7 +8,26 @@
 1. Install the USB serial drivers for your board:
     - Arduino Nano (mine): <a href="http://www.arduined.eu/files/windows8/CH341SER.zip">CHG340 drivers for Windows 10</a>
     - NodeMCU ESP8266: <a href="http://www.silabs.com/Support%20Documents/Software/CP210x_Windows_Drivers.zip">CP210x USB to UART Bridge VCP Drivers for Windows 10</a>
-1. Select the COM port in Arduino IDE menu: Tools -> Port -> COM?
+
+1. For NodeMCU ESP8266 support in Arduino IDE:
+    1. Go to menu File -> Preferences, Additional Boards Manager URLs:
+    http://arduino.esp8266.com/stable/package_esp8266com_index.json
+    and click OK.
+    1. Go to Tools -> Board -> Boards Manager
+    1. Filter by esp8266
+    1. Select and click Install. Arduino will install support for ESP8266 (around 150MB)
+    1. Click Close
+
+1. In Arduino IDE menu Tools, select:
+    - For Arduino Nano:
+        - Board: Arduino Nano
+        - Processor: ATmega328
+
+    - For NodeMCU ESP8266:
+        - Board: NodeMCU 1.0 (ESP-12E Module)
+
+    - Port: COM?
+    
 1. Download and open <a href="https://raw.githubusercontent.com/ramalhais/code/master/arduino/sketchbook/midifoot/midifoot.ino">midifoot.ino</a> in Arduino IDE
 1. Compile/Upload to Arduino board with Ctrl+U or menu: Sketch -> Upload (make sure the TX pin is disconnected)
 
