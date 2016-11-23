@@ -1,5 +1,3 @@
-// 
-
 // MIDI jack pin 5 connected to Digital pin 1 (TX) through a 220 ohm resistor
 // MIDI jack pin 2 connected to ground
 // MIDI jack pin 4 connected to +5V through a 220 ohm resistor
