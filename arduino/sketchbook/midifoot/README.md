@@ -73,21 +73,24 @@ An improvement would be to use the <a href="http://playground.arduino.cc/Main/Pi
 ### MIDI
 
 For Arduino Nano (5V signaling):
-1. MIDI jack pin 5 -> 220 Ohm resistor -> Arduino digital pin 1 (Serial TX)
-1. MIDI jack pin 2 -> Arduino pin GND
-1. MIDI jack pin 4 -> 220 Ohm resistor -> Arduino pin +5V
 
-For NodeMCU (3.3V signaling):
-1. MIDI jack pin 5 -> 10 Ohm 1/2W resistor -> NodeMCU pin 1 (Serial TX)
-1. MIDI jack pin 2 -> Arduino pin GND
-1. MIDI jack pin 4 -> 33 Ohm 1/2W resistor -> NodeMCU pin +3.3V
+- MIDI jack pin 5 -> 220 Ohm resistor -> Arduino digital pin 1 (Serial TX)
+- MIDI jack pin 2 -> Arduino pin GND
+- MIDI jack pin 4 -> 220 Ohm resistor -> Arduino pin +5V
+
+For NodeMCU (3.3V signaling: Check <a href="https://mitxela.com/other/ca33.pdf">(CA-033) MIDI 1.0 Electrical S
+pecification Update [2014] </a>):
+
+- MIDI jack pin 5 -> 10 Ohm 1/2W resistor -> NodeMCU pin 1 (Serial TX)
+- MIDI jack pin 2 -> Arduino pin GND
+- MIDI jack pin 4 -> 33 Ohm 1/2W resistor -> NodeMCU pin +3.3V
 
 Note:
 
-1. MIDI pin 2 is the center bottom
-1. MIDI pin 5 is left of pin 2
-1. MIDI pin 4 is right of pin 2
-1. Use arduino.cc <a href="https://www.arduino.cc/en/Tutorial/Midi">MIDI Tutorial</a>
+- MIDI pin 2 is the center bottom
+- MIDI pin 5 is left of pin 2
+- MIDI pin 4 is right of pin 2
+- Use arduino.cc <a href="https://www.arduino.cc/en/Tutorial/Midi">MIDI Tutorial</a>
 
 <img src="https://www.arduino.cc/en/uploads/Tutorial/MIDI_schem.png" />
 
