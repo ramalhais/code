@@ -72,9 +72,15 @@ An improvement would be to use the <a href="http://playground.arduino.cc/Main/Pi
 
 ### MIDI
 
+For Arduino Nano (5V signaling):
 1. MIDI jack pin 5 -> 220 Ohm resistor -> Arduino digital pin 1 (Serial TX)
 1. MIDI jack pin 2 -> Arduino pin GND
 1. MIDI jack pin 4 -> 220 Ohm resistor -> Arduino pin +5V
+
+For NodeMCU (3.3V signaling):
+1. MIDI jack pin 5 -> 10 Ohm 1/2W resistor -> NodeMCU pin 1 (Serial TX)
+1. MIDI jack pin 2 -> Arduino pin GND
+1. MIDI jack pin 4 -> 33 Ohm 1/2W resistor -> NodeMCU pin +3.3V
 
 Note:
 
