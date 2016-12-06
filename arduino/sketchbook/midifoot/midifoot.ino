@@ -72,7 +72,7 @@ int nbuttonmode_ch = 0;
   #include <WiFiManager.h>          // https://github.com/tzapu/WiFiManager WiFi Configuration Magic
 
   #define WIFI_DEFAULT_SSID "midifoot"
-  #define WIFI_DEFAULT_PASSWORD "itsmeleclerc"
+  #define WIFI_DEFAULT_PASSWORD "powerchord"
 
   WiFiManager wifi_manager;
   WiFiServer wifi_server(80);
@@ -368,10 +368,10 @@ void SanitizeState() {
 void MIDISendState() {
   if (midi_mode == MIDI_MODE_CC) {
     log("Sending MIDI: CC:" + String(midi_cc) + " CV:" + String(RANDALL_CC_CV) + " CH:" + String(midi_channel) + " .");
-//    MIDI.sendControlChange(midi_cc, RANDALL_CC_CV, midi_channel);
+    MIDI.sendControlChange(midi_cc, RANDALL_CC_CV, midi_channel);
   } else if (midi_mode == MIDI_MODE_PC) {
     log("Sending MIDI: PC:" + String(midi_pc) + " CH:" + String(midi_channel) + " .");
-//    MIDI.sendProgramChange(midi_pc, midi_channel);
+    MIDI.sendProgramChange(midi_pc, midi_channel);
   }
 }
 
@@ -401,7 +401,5 @@ void loop() {
 #ifdef ARDUINO_ESP8266_NODEMCU
   HandleHttpRequest();
 #endif // ARDUINO_ESP8266_NODEMCU
-
-  //MIDI.read();
 }
 
