@@ -53,7 +53,7 @@ int buttonPin[] = {2, 3, 4, 5};
 
 int buttonMode[] = {BUTTONMODE_CH, BUTTONMODE_CH, BUTTONMODE_UP, BUTTONMODE_BANKUP};
 int buttonModeVal[] = {1, 2, 1, 1}; // CH1, CH2, Current PC/CC+1, Current Bank+1
-int midi_cc = RANDALL_CC_CH1;
+int midi_cc = MIDI_CC_BUTTON1;
 int midi_pc = 1;
 int bank = 0;
 
