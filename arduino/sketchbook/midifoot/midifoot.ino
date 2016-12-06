@@ -139,6 +139,7 @@ void setup() {
 #endif
 
 #if LED_DEBUG
+  delay(1000);
   blink(++blinkStep, LED_BLINK_DURATION);
 #endif
 
