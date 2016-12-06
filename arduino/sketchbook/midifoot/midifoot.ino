@@ -379,7 +379,7 @@ void ButtonPress(int button) {
   ButtonUpdateState(button);
   SanitizeState();
   MIDISendState();
-  blink(i+1, LED_BLINK_DURATION);
+  blink(button, LED_BLINK_DURATION);
 }
 
 void HandleButtons() {
