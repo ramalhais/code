@@ -110,8 +110,7 @@ void blink(unsigned int times, unsigned int duration) {
 void MidifootOTA() {
   HTTPClient http;
   String payload = MIDIFOOT_VERSION;
-
-  http.begin("https://raw.githubusercontent.com/ramalhais/midifoot/esp/midifoot-latest.txt", "21 99 13 84 63 72 17 13 B9 ED 0E 8F 00 A5 9B 73 0D D0 56 58");
+  http.begin("https://raw.githubusercontent.com/ramalhais/code/esp/arduino/sketchbook/midifoot/midifoot-latest.txt", "21 99 13 84 63 72 17 13 B9 ED 0E 8F 00 A5 9B 73 0D D0 56 58");
   int httpCode = http.GET();
   if(httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
@@ -124,7 +123,7 @@ void MidifootOTA() {
 
   //  ESPhttpUpdate.update("github.com", 80, "/ramalhais/bla/arduino.bin");
   String midifootVersion = payload;
-  String firmwareUrl = "https://raw.githubusercontent.com/ramalhais/midifoot/esp/midifoot-" + midifootVersion + ".bin";
+  String firmwareUrl = "https://raw.githubusercontent.com/ramalhais/code/esp/arduino/sketchbook/midifoot/midifoot-" + midifootVersion + ".bin";
   String fingerprint = "21 99 13 84 63 72 17 13 B9 ED 0E 8F 00 A5 9B 73 0D D0 56 58";
   if (midifootVersion != MIDIFOOT_VERSION) {
     t_httpUpdate_return ret = ESPhttpUpdate.update(firemwareUrl, "", fingerprint);
