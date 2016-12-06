@@ -5,6 +5,11 @@
 #include <string.h>
 #include <MIDI.h>
 
+#ifdef MIDIFOOT_OTA
+  #warning "Enabling OTA Update"
+  #define MIDIFOOT_VERSION "esp-1.0.0"
+#endif // MIDIFOOT_OTA
+
 // Need to look into using RTP-MIDI: https://github.com/lathoub/Arduino-AppleMidi-Library
 #define LED_DEBUG 1
 #define PIN_LED_ONBOARD LED_BUILTIN
@@ -58,11 +63,6 @@ int midi_pc = 1;
 int bank = 0;
 
 int nbuttonmode_ch = 0;
-
-#ifdef MIDIFOOT_OTA
-  #warning "Enabling OTA Update"
-  #define MIDIFOOT_VERSION "esp-1.0.0"
-#endif // MIDIFOOT_OTA
 
 #ifdef ARDUINO_ESP8266_NODEMCU
 // https://github.com/nodemcu/nodemcu-devkit-v1.0
@@ -379,6 +379,7 @@ void ButtonPress(int button) {
   ButtonUpdateState(button);
   SanitizeState();
   MIDISendState();
+  blink(i+1, LED_BLINK_DURATION);
 }
 
 void HandleButtons() {
@@ -389,7 +390,6 @@ void HandleButtons() {
     if (pinVal[i] != pinValNew) {
       pinVal[i] = pinValNew;
       ButtonPress(i+1);
-      blink(i+1, LED_BLINK_DURATION);
 //      delay(500);
       break;
     }
