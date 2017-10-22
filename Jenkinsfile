@@ -25,6 +25,11 @@ pipeline {
         sh 'date; df -h; date'
       }
     }
+    stage('Save Artifact') {
+      steps {
+        archiveArtifacts 'Jenkinsfile'
+      }
+    }
   }
   environment {
     dbConnectionString = 'mysql://localhost/bla'
