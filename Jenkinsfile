@@ -14,6 +14,11 @@ pipeline {
             sh 'ls -laR'
           }
         }
+        stage('Print Environment') {
+          steps {
+            sh 'echo $dbConnectionString'
+          }
+        }
       }
     }
     stage('Check disk space') {
