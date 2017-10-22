@@ -15,7 +15,7 @@ pipeline {
         }
         stage('Print Environment') {
           steps {
-            sh 'date; echo $dbConnectionString; date; sleep 5; date'
+            sh 'date; env; date; sleep 5; date'
           }
         }
       }
