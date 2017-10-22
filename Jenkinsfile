@@ -22,7 +22,7 @@ pipeline {
     }
     stage('Check disk space') {
       steps {
-        sh 'df -h'
+        sh 'date; df -h; date'
       }
     }
   }
