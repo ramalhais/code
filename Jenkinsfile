@@ -5,18 +5,17 @@ pipeline {
       parallel {
         stage('List Files') {
           steps {
-            sh 'ls -la'
-            sh 'pwd'
+            sh 'date; ls -laR; date'
           }
         }
         stage('List Files2') {
           steps {
-            sh 'ls -laR'
+            sh 'date; ls -laR; date'
           }
         }
         stage('Print Environment') {
           steps {
-            sh 'echo $dbConnectionString'
+            sh 'date; echo $dbConnectionString; date; sleep 5; date'
           }
         }
       }
