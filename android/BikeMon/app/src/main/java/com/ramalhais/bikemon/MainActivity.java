@@ -3,7 +3,6 @@ package com.ramalhais.bikemon;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
@@ -16,7 +15,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.graphics.Paint;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -26,46 +24,32 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.Layout;
 import android.util.Log;
 import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
-import android.widget.Toast;
 
 import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.jjoe64.graphview.DefaultLabelFormatter;
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.LegendRenderer;
-import com.jjoe64.graphview.ValueDependentColor;
-import com.jjoe64.graphview.helper.DateAsXAxisLabelFormatter;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import static java.lang.Math.abs;
 
@@ -163,6 +147,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // GraphView
         graph = new GraphView(this);
 //        graph.getViewport().setScalableY(true);
 //        graph.getViewport().setScalable(true);
@@ -187,7 +172,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //        });
         graph.getGridLabelRenderer().setNumHorizontalLabels(0);
         graph.getGridLabelRenderer().setHumanRounding(true);
-
 
         mSeriesAFR = new LineGraphSeries<>();
         mSeriesAFR.setDrawDataPoints(true);
@@ -215,6 +199,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         graph.getSecondScale().setMaxY(130);
         graph.getGridLabelRenderer().setVerticalLabelsSecondScaleColor(Color.LTGRAY);
 
+        dialAccel = new
+        // MPAndroidChart
         chart = new LineChart(this);
         chart.setMinimumHeight(1500);
         chart.getDescription().setEnabled(false);
@@ -240,14 +226,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //        xAxis.setCenterAxisLabels(true);
 //        xAxis.setGranularity(.1f);
 //        xAxis.setGranularityEnabled(false);
-        xAxis.setValueFormatter(new ValueFormatter() {
-            private final SimpleDateFormat mFormat = new SimpleDateFormat("YYYY-MM-dd HH:mm:ss", Locale.ENGLISH);
-
-            @Override
-            public String getFormattedValue(float value) {
-                return mFormat.format(new Date((long) value));
-            }
-        });
+//        xAxis.setValueFormatter(new ValueFormatter() {
+//            private final SimpleDateFormat mFormat = new SimpleDateFormat("YYYY-MM-dd HH:mm:ss", Locale.ENGLISH);
+//
+//            @Override
+//            public String getFormattedValue(float value) {
+//                return mFormat.format(new Date((long) value));
+//            }
+//        });
 
         YAxis leftAxis = chart.getAxisLeft();
 //        leftAxis.setTypeface(tfLight);
@@ -277,7 +263,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            entriesSpeed.add(new Entry(TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()), i));
             entriesSpeed.add(new Entry(System.currentTimeMillis(), i));
         }
-        xAxis.setAxisMinimum(xAxis.getAxisMinimum());
+//        xAxis.setAxisMinimum(xAxis.getAxisMinimum());
 
         LineDataSet dataSetAFR = new LineDataSet(entriesAFR, "AFR");
         LineDataSet dataSetAccel = new LineDataSet(entriesAccel, "Accel");
@@ -330,17 +316,17 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             Log.v(TAG, "Device doesn't support Bluetooth");
 
             // get a layout defined in xml
-        LinearLayout layout = (LinearLayout) findViewById(R.id.layout);
-//        layout.addView(chart, LinearLayout.LayoutParams.MATCH_PARENT);
-        layout.addView(graph, LinearLayout.LayoutParams.MATCH_PARENT);
+        LinearLayout layout1 = (LinearLayout) findViewById(R.id.layout1);
+        LinearLayout layout2 = (LinearLayout) findViewById(R.id.layout2);
+        layout1.addView(chart, LinearLayout.LayoutParams.MATCH_PARENT);
+//        layout2.addView(graph, LinearLayout.LayoutParams.MATCH_PARENT);
 
     }
 
     private void updateChart() {
-//        chart.moveViewToX(chart.getXChartMax());
         chart.moveViewToX(chart.getXChartMax());
 //        chart.fitScreen();
-        chart.setVisibleXRangeMaximum(10);
+//        chart.setVisibleXRangeMaximum(10);
         chart.invalidate();
 
 //        graph.invalidate();
@@ -349,14 +335,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
-//            entriesAccel.add(new Entry(TimeUnit.MILLISECONDS.toHours(event.timestamp), event.values[0]));
 //            float ts = System.currentTimeMillis();
             int ts = mCount++;
 //            long ts = event.timestamp
-            entriesAccel.add(new Entry(ts, event.values[1]));
 
-            double val = abs(event.values[1]) > 9.8/10 ? event.values[1]/9.8 : 0;
+            double accelGravity = 9.8;
+            double accelThreshold = accelGravity*.1;
+            double val = abs(event.values[1]) >= accelThreshold ? event.values[1]/accelGravity : 0;
 //            double val = event.values[1];
+
+//            entriesAccel.add(new Entry(TimeUnit.MILLISECONDS.toHours(event.timestamp), event.values[0]));
+            entriesAccel.add(new Entry(ts, (float) val));
+
             mSeriesAccel.appendData(new DataPoint(ts, val),true, 1000);
 
             updateChart();
@@ -415,13 +405,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 //            float ts = System.currentTimeMillis();
             int ts = mCount++;
 //            long ts = location.getTime();
-//            entriesSpeed.add(new Entry(TimeUnit.MILLISECONDS.toHours(ts), location.getSpeed()*3600/1000));
-            entriesSpeed.add(new Entry(ts, location.getSpeed()*3600/1000));
+            double val = location.getSpeed()*3600/1000;
 
-            mSeriesSpeed.appendData(new DataPoint(ts, location.getSpeed()*3600/1000), true, 1000);
+//            entriesSpeed.add(new Entry(TimeUnit.MILLISECONDS.toHours(ts), location.getSpeed()*3600/1000));
+            entriesSpeed.add(new Entry(ts, (float)val));
+
+            mSeriesSpeed.appendData(new DataPoint(ts, val), true, 1000);
 
             updateChart();
-            Log.v(TAG, "Speed: " + location.getSpeed()*3600/1000);
+            Log.v(TAG, "Speed: " + val);
         }
     }
 }
