@@ -28,8 +28,7 @@ typedef struct {
 
 void setup() {
   setDefaults();
-  //Serial.begin(115200);
-  Serial.begin(9600);
+  Serial.begin(115200);
 //  Serial.println("Serial Txd is on pin: "+String(TX));
 //  Serial.println("Serial Rxd is on pin: "+String(RX));
   Serial2.begin(9600, SERIAL_8N1, PIN_RX_DIGITAL_AFR, PIN_TX_SACRIFICE, true);
@@ -38,16 +37,7 @@ void setup() {
   // initialize digital pin LED_BUILTIN as an output.
   pinMode(LED_BUILTIN, OUTPUT);
 
-  while(!SerialBT.begin("BikeMon", false)) {
-    delay(500);
-  }
-
-  // Wait for Bluetooth client
-  while(!SerialBT.hasClient()) {
-    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-    delay(500);
-  }
-  digitalWrite(LED_BUILTIN, LED_OFF);
+  SerialBT.begin("BikeMon", false);
 }
 
 int rpm = 1300;
@@ -104,18 +94,14 @@ void btElmSend(String str, String origCmd="", String strDataBytes="", bool promp
 void loop() {
   if(Serial2.available() > 0) {
       afr = Serial2.read();
-//      Serial.println("APSX DEC AFR: " + String(b,DEC));
-//      Serial.println("APSX HEX AFR: " + String(b,HEX));
-//      Serial.println("APSX BIN AFR: " + String(b,BIN));
-//      Serial.println("INV: " + String(b^0xff,BIN));
-//      Serial.print(char(b));
-      //Serial.write(b);
+//      Serial.println("APSX DEC AFR: " + String(afr,DEC));
+//      Serial.println("APSX HEX AFR: " + String(afr,HEX));
+      //Serial.write(afr);
 //      Serial.flush();
-//      SerialBT.println("APSX DEC AFR: " + String(b,DEC));
-//      SerialBT.println("APSX HEX AFR: " + String(b,HEX));
   }
-  if(SerialBT.available() > 0) {
-    digitalWrite(LED_BUILTIN, LED_ON);
+  
+  if(SerialBT.hasClient() && SerialBT.available() > 0) {
+    digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     String line = SerialBT.readStringUntil('\r');
     if (line == "") {
       String line = SerialBT.readStringUntil('\n');
@@ -237,7 +223,22 @@ void loop() {
     } else if(line.startsWith("0124")) { // O2_S1_WR_VOLTAGE: 02 Sensor 1 WR Lambda Voltage
 //      btElmSend("41 24 7B A8 65 D9", line, "06");
 //      btElmSend("41 24 3F 80 00 00", line, "06"); //1V
-      btElmSend("41 24 40 A0 00 00", line, "06"); //5V
+//      btElmSend("41 24 40 A0 00 00", line, "06"); //5V no workie
+//      btElmSend("41 24 40 40 00 00", line, "06"); //3V
+//      btElmSend("41 24 3F C0 00 00", line, "06"); //1.5V
+//      btElmSend("41 24 3F 00 00 00", line, "06"); //0.5V
+      float fval = ((afr/147.0)/2)*0xffff;
+//      Serial.println("fval="+String(fval));
+      unsigned short int val = (unsigned short int)fval;
+//      Serial.println("val="+String(val,DEC));
+      char buffer[3];
+      sprintf(buffer, "%.2x", val>>8);
+      String A = String(buffer);
+//      Serial.println("valA=" + A);
+      sprintf(buffer, "%.2x", val&0xff);
+      String B = String(buffer);
+//      Serial.println("valB=" + B);
+      btElmSend("41 24 " + A + " " + B, line, "04");
     } else if(line.startsWith("0133")) { // BAROMETRIC_PRESSURE: Barometric Pressure
       btElmSend("41 33 61", line, "03");
     } else if(line.startsWith("010B")) { // INTAKE_PRESSURE: Intake Manifold Pressure
@@ -272,7 +273,7 @@ void loop() {
       btElmSend("?", line);
     }
   } else {
-    digitalWrite(LED_BUILTIN, LED_OFF);
+    digitalWrite(LED_BUILTIN, LED_ON);
   }
   
 
