@@ -12,6 +12,12 @@ reg [23:0] clockCounter = 0;
 reg enabled = 1;
 
 always @(posedge clk) begin
+    // if (!btn1) begin
+    //     enabled <= ~enabled;
+    // end
+    if (!btn2) begin
+        clockCounter <= 0;
+    end
     if (enabled) begin
         clockCounter <= clockCounter + 1;
         if (clockCounter == WAIT_TIME) begin
@@ -19,14 +25,6 @@ always @(posedge clk) begin
             ledCounter <= ledCounter + 1;
         end
     end
-end
-
-always @(negedge btn2) begin
-    clockCounter <= 1;
-end
-
-always @(negedge btn1) begin
-    enabled <= ~enabled;
 end
 
 assign led = ~ledCounter;

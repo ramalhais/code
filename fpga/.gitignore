@@ -1,0 +1,6 @@
+*.o
+*.fs
+*.vcd
+*.json
+abc.history
+!*.lushay.json
