@@ -1,0 +1,6 @@
+{
+    "name": "test",
+    "includedFiles": ["test.v"],
+    "constraintsFile": "test.cst",
+    "top": "test"
+}

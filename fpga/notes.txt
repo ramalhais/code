@@ -1,0 +1,5 @@
+https://learn.lushaylabs.com/tang-nano-series/
+https://learn.lushaylabs.com/getting-setup-with-the-tang-nano-9k/
+https://learn.lushaylabs.com/content/files/2022/08/Tang_Nano_9K_3672_schematic.pdf
+https://learn.lushaylabs.com/content/files/2022/08/SUG935E-appendixA.pdf
+https://github.com/YosysHQ/apicula/blob/master/doc/longval-tables.md?ref=learn.lushaylabs.com
