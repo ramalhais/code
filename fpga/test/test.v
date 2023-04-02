@@ -12,12 +12,6 @@ reg [23:0] clockCounter = 0;
 reg enabled = 1;
 
 always @(posedge clk) begin
-    // if (!btn1) begin
-    //     enabled <= ~enabled;
-    // end
-    if (!btn2) begin
-        clockCounter <= 0;
-    end
     if (enabled) begin
         clockCounter <= clockCounter + 1;
         if (clockCounter == WAIT_TIME) begin

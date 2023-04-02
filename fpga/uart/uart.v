@@ -72,7 +72,6 @@ end
 always @(posedge clk) begin
     if (byteReady) begin
         led <= ~dataIn[5:0];
-//        led <= dataIn[5:0];
     end
     else begin
         led <= 6'b010101;

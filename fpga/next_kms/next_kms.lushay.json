@@ -1,0 +1,6 @@
+{
+    "name": "next_kms",
+    "includedFiles": "all",
+    "constraintsFile": "next_kms.cst",
+    "top": "next_kms"
+}

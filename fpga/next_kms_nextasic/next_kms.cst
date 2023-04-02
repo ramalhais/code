@@ -1,0 +1,43 @@
+// Generated with Lushay Code
+
+IO_LOC  "to_kb" 53;
+IO_PORT "to_kb" IO_TYPE=LVCMOS33;
+
+IO_LOC  "from_kb" 54;
+IO_PORT "from_kb" IO_TYPE=LVCMOS33;
+
+IO_LOC  "from_mon" 55;
+IO_PORT "from_mon" IO_TYPE=LVCMOS33;
+
+IO_LOC  "to_mon" 56;
+IO_PORT "to_mon" IO_TYPE=LVCMOS33;
+
+IO_LOC  "mon_clk" 57;
+IO_PORT "mon_clk" IO_TYPE=LVCMOS33;
+
+IO_LOC  "clk" 52;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+IO_LOC  "led[0]" 10;
+IO_PORT "led[0]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "led[1]" 11;
+IO_PORT "led[1]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "led[2]" 13;
+IO_PORT "led[2]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "led[3]" 14;
+IO_PORT "led[3]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "led[4]" 15;
+IO_PORT "led[4]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "led[5]" 16;
+IO_PORT "led[5]" DRIVE=8 IO_TYPE=LVCMOS18;
+
+IO_LOC  "btn1" 3;
+IO_PORT "btn1" IO_TYPE=LVCMOS18;
+
+IO_LOC  "btn2" 4;
+IO_PORT "btn2" IO_TYPE=LVCMOS18;
