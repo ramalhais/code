@@ -41,7 +41,6 @@ static inline void out_hi(void) {
 #define reset_delay(intervals)   do { reset();  delayMicroseconds((NEXT_KBD_TIMING) * intervals); } while (0);
 
 #define PACKET_SIZE 10
-#define STOP_SIZE 2
 #define QUERY_SIZE 22
 
 bool kms_is_ready() {
@@ -110,7 +109,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting Serial");
 
-  pinMode(PIN_TO_KBD, INPUT_PULLDOWN);
+  pinMode(PIN_TO_KBD, INPUT_PULLUP);
   pinMode(PIN_FROM_KBD, OUTPUT);
   out_hi();
 }
