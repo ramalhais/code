@@ -92,7 +92,7 @@ NextSoundBox nextsb(
     latest_keycode,
     latest_keycode_valid,
     is_muted,
-    volume_db, 
+    volume_db,
     volume_db_valid,
     enable_next_keyboard,
     debug_test_pins
