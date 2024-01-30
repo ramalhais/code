@@ -1,3 +1,4 @@
+// Not apostrophe, it's tilde or backtick or grave
 #define KEY_APOSTROPHE 0x26 // 0b00100110
 #define KD_KEYMASK	0x7f
 #define KD_DIRECTION	0x80
@@ -19,7 +20,8 @@ char sendCmdAposRelease[] = {0b11100011, 0b00001000, 0b00000000, KD_VALID, KEY_A
 
 
 // https://github.com/tmk/tmk_keyboard/issues/704
-#define NEXT_KBD_TIMING     52
+#define NEXT_KBD_TIMING     52 // scope says 52.75 to 53.125
+//#define NEXT_KBD_TIMING     53 // scope says close to 54us
 
 #define PIN_TO_KBD    32  // Input to this keyboard
 #define PIN_FROM_KBD  33  // Output from this keyboard
@@ -65,7 +67,6 @@ uint32_t kms_read() {
   cli();
   int bit=0;
   for (; bit<PACKET_SIZE; bit++) {
-    //ets_delay_us
     result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
     delayMicroseconds(NEXT_KBD_TIMING);
   }
@@ -76,9 +77,9 @@ uint32_t kms_read() {
 
   #define BIT_RW 5
   if (result&(1<<BIT_RW)) {
+//    delayMicroseconds(NEXT_KBD_TIMING);
     return result;
-  } else
-    Serial.println("");
+  }
 
   // Stop bit 2
   result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
@@ -86,12 +87,11 @@ uint32_t kms_read() {
   bit++;
 
   for (; bit<QUERY_SIZE; bit++) {
-    //ets_delay_us
     result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
     delayMicroseconds(NEXT_KBD_TIMING);
   }
   sei();
-
+  Serial.println("");
   return result;
 }
 
@@ -110,22 +110,31 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting Serial");
 
-  pinMode(PIN_TO_KBD, INPUT_PULLUP);
+  pinMode(PIN_TO_KBD, INPUT_PULLDOWN);
   pinMode(PIN_FROM_KBD, OUTPUT);
   out_hi();
 }
 
 char c = 0;
+char modifiers = 0;
 bool pressed = false;
 
 void loop() {
-  bool handled = false;
-
   if (c == 0 && Serial.available()) {
     char tmpc = Serial.read();
-    if (tmpc != 0x0A) {
+//    if (tmpc != 0x0A) {
       c = tmpc;
       pressed = true;
+//    }
+
+    if (c == 'Q') {
+      c = KEY_APOSTROPHE;
+      modifiers = KD_RCOMM;
+    } else if (c == 0x0A) {
+      c = 0x2A; // ENTER/RETURN
+    } else {
+      #define NEXT_KEY_A 0x39
+      c = c-('a'-NEXT_KEY_A);
     }
   }
 
@@ -133,93 +142,85 @@ void loop() {
     uint32_t result = kms_read();
 
     if ((result&0x1FF) == 0b000100000) {
-      handled = true;
-      Serial.printf("Q");
-      if (c && c != 0x0A) {
-        #define NEXT_KEY_A 0x39
-        char c2 = c-('A'-NEXT_KEY_A);
-        char modifiers = 0;
-        sendKey(c2, pressed, modifiers);
-        Serial.printf("\nSent %c (0x%x) as 0x%x. pressed=%d\n", c, c, c2, pressed);
+      Serial.printf("K");
+      if (c) {
+        sendKey(c, pressed, modifiers);
+        Serial.printf("\nSent %c (0x%x). pressed=%d modifiers=0x%x\n", c, c, pressed, modifiers);
         if (pressed) {
           pressed = false;
         } else {
           c = 0;
+          modifiers = 0;
         }
       } else {
         sendKey(0, false, 0);
       }
-    }
-
-    if ((result&0x1FF) == 0b000100010) {
-      handled = true;
+    } else if ((result&0x1FF) == 0b000100010) {
       Serial.printf("M");
       char mousex = 1;
       char mousey = 1;
       bool button1 = false;
       bool button2 = false;
       sendMouse(mousex, mousey, button1, button2);
-    }
-
-    if ((result&0x3FFFFF) == 0b0000000000111111011110) {
-      handled = true;
-      Serial.printf("R");
-    }
-
-    if ((result&0x1FFF) == 0b0111000000000) {
-      handled = true;
-      Serial.printf("L");
-
+    } else if ((result&0x3FFFFF) == 0b0000000000111111011110) {
+      Serial.println("\nRESET");
+    } else if ((result&0x1FFF) == 0b0111000000000) {
+      Serial.println("");
       if (result&0x2000)
-        Serial.printf("\nLEFT ON\n");
+        Serial.printf("L");
       else
-        Serial.printf("\nLEFT OFF\n");
+        Serial.printf("l");
 
       if (result&0x4000)
-        Serial.printf("\nRIGHT ON\n");
+        Serial.printf("R");
       else
-        Serial.printf("\nRIGHT OFF\n");
-    }
-
-    if (!handled) {
+        Serial.printf("r");
+      
+      Serial.println("");
+    } else {
   //    Serial.printf("kms_read=0x%x\n", result);
-      Serial.printf("\n");
+      Serial.println("");
       print_byte((result >> 16)&0xff);
       print_byte((result >>  8)&0xff);
       print_byte( result       &0xff);
-      Serial.printf("\n");
+      Serial.println("");
 //      Serial.printf("?");
     }
   }
 
 }
 
-// pressed should be true if a key is pressed or any modifier is pressed
-static inline void sendKey(char key, bool pressed, char modifiers)
-{
+static inline void sendKey(char key, bool pressed, char modifiers) {
   cli();
-//  out_hi_delay(6); // OFF high. make sure HIGH at least 12 times?
 
-  // drakware says first should be zero. total 21 bits maybe 22 last zero aswell
-  out_lo_delay(1); // Start bit (0)
+  // Start bit
+  out_lo_delay(1);
 
+  // 8 bit data
   for (int bit=0; bit<=6; bit++)
     out_delay(key&(1<<bit));
-  out_delay(!pressed);
+  out_delay(key&&!pressed);
 
-  out_delay(!(key)); // C/D (Command/Data) = 0 (Data). If not data, send Command and data all zeroes
-  out_hi_delay(2); // 2 Stop bits
-  out_lo_delay(1); // Start bit
+  // C/D (Command/Data) = 0 (Data). If no data, send 1 (Command) and data all zeroes
+  out_delay(!(key||modifiers));
 
+  // Stop bit
+  out_hi_delay(1);
+
+  // Start bit
+  out_lo_delay(1);
+
+  // 8 bit data
   for (int bit=0; bit<=6; bit++)
     out_delay(modifiers&(1<<bit));
-  out_delay(!modifiers);
+  out_delay((key||modifiers));
 
-  out_delay(!(modifiers)); // C/D (Command/Data) = 0 (Data). If not data, send Command and data all zeroes
-  //out_delay(!(key||modifiers)); // fixed 0? ready packet (empty) should be 1?
-  //out_lo_delay(1); // fixed 0? ready packet (empty) should be 1?
+  // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
+  out_delay(!(key||modifiers));
 
-  out_hi_delay(1); // OFF high. make sure HIGH at least 12 times?
+  // Stop bit
+  out_hi_delay(1);
+
   sei();
 }
 
