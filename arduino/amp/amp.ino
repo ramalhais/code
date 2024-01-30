@@ -3,12 +3,17 @@
 BLEMIDI_CREATE_INSTANCE("AmpMIDI", MIDI)
 
 #ifndef LED_BUILTIN
-#define LED_BUILTIN 22
+#define LED_BUILTIN 22 // ESP32 WeMos LOLIN32 Lite (w/ battery connector)
+//#define LED_BUILTIN 32
 #endif
 #define LED_ON LOW
 #define LED_OFF HIGH
 
-#define BUT_SEL_PIN 12
+#define PIN_ENABLE LOW
+#define PIN_DISABLE HIGH
+
+#define BUT_SEL_PIN 12 // ESP32 WeMos LOLIN32 Lite (w/ battery connector)
+//#define BUT_SEL_PIN 0 // ESP32 DevKitC V4
 #define BUT_SEL_OFF HIGH
 #define BUT_SEL_ON LOW
 #define BUT_SEL_MIN_PRESS_MILLIS 100
@@ -18,7 +23,8 @@ BLEMIDI_CREATE_INSTANCE("AmpMIDI", MIDI)
 bool but_sel_state = BUT_SEL_OFF;
 unsigned long but_sel_pressed_millis = millis();
 
-int channel_pins[] = {32, 33, 32};
+int channel_pins[] = {32, 33, 25}; // ESP32 WeMos LOLIN32 Lite (w/ battery connector)
+//int channel_pins[] = {25, 26, 27}; // ESP32 DevKitC V4
 #define CHANNEL_COUNT (sizeof(channel_pins)/sizeof(int))
 int channel_current = -1;
 
@@ -36,19 +42,19 @@ unsigned short midi_pc_current = 0;
 void mute() {
   for (int i=0; i<CHANNEL_COUNT; i++) {
     pinMode(channel_pins[i], OUTPUT);
-    digitalWrite(channel_pins[i], LOW);
+    digitalWrite(channel_pins[i], PIN_DISABLE);
   }
   channel_current = -1;
 }
 
-int channel_select(int channel) {
+int channel_select(int channel_new) {
   if (channel_current >= 0) {
-    digitalWrite(channel_pins[channel_current], LOW);
+    digitalWrite(channel_pins[channel_current], PIN_DISABLE);
   }
-  channel_current = channel;
-  if (channel_current >= 0) {
-    digitalWrite(channel_pins[channel_current], HIGH);
+  if (channel_new >= 0) {
+    digitalWrite(channel_pins[channel_new], PIN_ENABLE);
   }
+  channel_current = channel_new;
 
   DEBUG(Serial.printf("CH=%d;\n", channel_current));
 
@@ -127,8 +133,8 @@ void handleProgramChange(byte midiChannel, byte pc) {
 void setup() {
   mute();
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(BUT_SEL_PIN, INPUT_PULLUP);
 
+  pinMode(BUT_SEL_PIN, INPUT_PULLUP);
   Serial.begin(115200);
 
   BLEMIDI.setHandleConnected(OnConnected);
@@ -136,6 +142,7 @@ void setup() {
   MIDI.setHandleControlChange(handleControlChange);
   MIDI.setHandleProgramChange(handleProgramChange);
   MIDI.begin(MIDI_CHANNEL_OMNI);
+  Serial.println("Setup complete");
 }
 
 void loop() {
