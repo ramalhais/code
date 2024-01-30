@@ -45,8 +45,8 @@ module Keyboard(
 	assign keyboard_data[7:0] = tmp[8:1];
 	assign keyboard_data[15:8] = tmp[19:12];
 	
-	assign debug[2] = data_receved;
 	assign debug[1:0] = kb_state;
+	assign debug[2] = data_receved;
 	assign debug[3] = is_recving;
 	assign debug[4] = can_recv_start;
 	
@@ -113,7 +113,7 @@ module Keyboard(
 				send_count <= send_count + 1'b1;
 			end
 		end else begin
-			key_clk_count = key_clk_count + 1'b1;
+			key_clk_count <= key_clk_count + 1'b1;// = (original) or <= ?
 		end
 		
 		if (led_data_valid) begin
@@ -152,7 +152,7 @@ module Keyboard(
 				// end else begin
 				// 	// not valid data, abort recving
 				// 	is_recving <= 0;
-				// end		
+				// end
 			end else if (recv_delay == KEY_CLK) begin
 				recv_delay <= 0;
 				tmp[20:0] <= {from_kb, tmp[20:1]};

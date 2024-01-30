@@ -31,7 +31,8 @@ module NextSoundBox (
     output [11:0] volume_db, // Lch, Rch
     output volume_db_valid,
 
-    input enable_next_keyboard
+    input enable_next_keyboard,
+    output [4:0] debug_test_pins
 );
 
 
@@ -147,8 +148,8 @@ module NextSoundBox (
         is_mouse_data,
         keyboard_data_nonadb[15:0], // keyboard_data
         from_kb,
-        to_kb
-        //debug_test_pins[4:0]
+        to_kb,
+        debug_test_pins[4:0]
     );
     
     wire [16:0] keyboard_data_s; // FPGA(system) clock side
