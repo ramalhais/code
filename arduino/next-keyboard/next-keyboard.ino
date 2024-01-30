@@ -38,6 +38,8 @@ static inline void out_hi(void) {
 #define query_delay(intervals)   do { query();  delayMicroseconds((NEXT_KBD_TIMING) * intervals); } while (0);
 #define reset_delay(intervals)   do { reset();  delayMicroseconds((NEXT_KBD_TIMING) * intervals); } while (0);
 
+#define PACKET_SIZE 10
+#define STOP_SIZE 2
 #define QUERY_SIZE 22
 
 bool kms_is_ready() {
@@ -61,7 +63,29 @@ uint32_t kms_read() {
   uint32_t result = 0;
 
   cli();
-  for (int bit=0; bit<QUERY_SIZE; bit++) {
+  int bit=0;
+  for (; bit<PACKET_SIZE; bit++) {
+    //ets_delay_us
+    result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
+    delayMicroseconds(NEXT_KBD_TIMING);
+  }
+  // Stop bit
+  result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
+  delayMicroseconds(NEXT_KBD_TIMING);
+  bit++;
+
+  #define BIT_RW 5
+  if (result&(1<<BIT_RW)) {
+    return result;
+  } else
+    Serial.println("");
+
+  // Stop bit 2
+  result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
+  delayMicroseconds(NEXT_KBD_TIMING);
+  bit++;
+
+  for (; bit<QUERY_SIZE; bit++) {
     //ets_delay_us
     result |= (digitalRead(PIN_TO_KBD) == HIGH) << bit;
     delayMicroseconds(NEXT_KBD_TIMING);
@@ -91,8 +115,19 @@ void setup() {
   out_hi();
 }
 
+char c = 0;
+bool pressed = false;
+
 void loop() {
   bool handled = false;
+
+  if (c == 0 && Serial.available()) {
+    char tmpc = Serial.read();
+    if (tmpc != 0x0A) {
+      c = tmpc;
+      pressed = true;
+    }
+  }
 
   if (kms_is_ready()) {
     uint32_t result = kms_read();
@@ -100,15 +135,16 @@ void loop() {
     if ((result&0x1FF) == 0b000100000) {
       handled = true;
       Serial.printf("Q");
-      if (Serial.available()) {
-        char c = Serial.read();
-        if (c != 0x0A) {
-          #define NEXT_KEY_A 0x39
-          char c2 = c-('A'-NEXT_KEY_A);
-          char modifiers = 0;
-          sendKey(c2, true, modifiers);
-          //sendKey(c2, false, modifiers);
-          Serial.printf("\nSent %c (0x%x) as 0x%x\n", c, c, c2);
+      if (c && c != 0x0A) {
+        #define NEXT_KEY_A 0x39
+        char c2 = c-('A'-NEXT_KEY_A);
+        char modifiers = 0;
+        sendKey(c2, pressed, modifiers);
+        Serial.printf("\nSent %c (0x%x) as 0x%x. pressed=%d\n", c, c, c2, pressed);
+        if (pressed) {
+          pressed = false;
+        } else {
+          c = 0;
         }
       } else {
         sendKey(0, false, 0);
@@ -148,9 +184,9 @@ void loop() {
     if (!handled) {
   //    Serial.printf("kms_read=0x%x\n", result);
       Serial.printf("\n");
-      print_byte((result&0xff0000) >> 16);
-      print_byte((result&0xff00) >> 8);
-      print_byte(result&0xff);
+      print_byte((result >> 16)&0xff);
+      print_byte((result >>  8)&0xff);
+      print_byte( result       &0xff);
       Serial.printf("\n");
 //      Serial.printf("?");
     }
@@ -162,27 +198,28 @@ void loop() {
 static inline void sendKey(char key, bool pressed, char modifiers)
 {
   cli();
-  out_hi_delay(6); // OFF high. make sure HIGH at least 12 times?
+//  out_hi_delay(6); // OFF high. make sure HIGH at least 12 times?
 
   // drakware says first should be zero. total 21 bits maybe 22 last zero aswell
-  out_lo_delay(1); // fixed 0
+  out_lo_delay(1); // Start bit (0)
 
   for (int bit=0; bit<=6; bit++)
     out_delay(key&(1<<bit));
   out_delay(!pressed);
 
-  out_lo_delay(1); // fixed 0
-  out_delay(!(key||modifiers)); // fixed 1. maybe 0 if keyboard data
-  out_hi_delay(1); // fixed 1 ?? are you sure drakware? 
-  out_lo_delay(1); // fixed 0
+  out_delay(!(key)); // C/D (Command/Data) = 0 (Data). If not data, send Command and data all zeroes
+  out_hi_delay(2); // 2 Stop bits
+  out_lo_delay(1); // Start bit
 
   for (int bit=0; bit<=6; bit++)
     out_delay(modifiers&(1<<bit));
-  out_delay(key||modifiers); // fixed 0 // IS_VALID? should be HIGH instead? send not valid if no key/modifier pressed
+  out_delay(!modifiers);
 
-  out_delay(!(key||modifiers)); // fixed 0? ready packet (empty) should be 1?
+  out_delay(!(modifiers)); // C/D (Command/Data) = 0 (Data). If not data, send Command and data all zeroes
+  //out_delay(!(key||modifiers)); // fixed 0? ready packet (empty) should be 1?
+  //out_lo_delay(1); // fixed 0? ready packet (empty) should be 1?
 
-  out_hi_delay(6); // OFF high. make sure HIGH at least 12 times?
+  out_hi_delay(1); // OFF high. make sure HIGH at least 12 times?
   sei();
 }
 
