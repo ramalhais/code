@@ -32,9 +32,10 @@ module NextSoundBox (
     output volume_db_valid,
 
     input enable_next_keyboard,
-    output [4:0] debug_test_pins
+    output [2:0] debug
 );
 
+assign debug = {out_valid,out_data_retrieved,keyboard_data_ready};
 
     // dummy
     // assign spdif_led0 = from_mon;
@@ -149,7 +150,7 @@ module NextSoundBox (
         keyboard_data_nonadb[15:0], // keyboard_data
         from_kb,
         to_kb,
-        debug_test_pins[4:0]
+        // debug[2:0]
     );
     
     wire [16:0] keyboard_data_s; // FPGA(system) clock side
@@ -267,7 +268,8 @@ module NextSoundBox (
         audio_sample_request_tick,
         from_mon,
         data_loss,
-        out_data_retrieved
+        out_data_retrieved,
+        // debug[2:0]
     );
 
 endmodule

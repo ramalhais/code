@@ -9,25 +9,28 @@ module Sender(
 	input wire audio_sample_request_tick,
 	output wire sout, // serial out
 	output reg data_loss = 0,
-	output wire data_retrieved
+	output wire data_retrieved,
+	output [2:0] debug
 );
+
+	assign debug[2:0] = {data_retrieved,has_buffer_data,state};
 
 	localparam READY = 1'b0; // define state
 	localparam SEND = 1'b1;
-	
+
 	reg [39:0] buffer;
 	reg has_buffer_data = 0;
-	
+
 	reg [40:0] data = 0;
-	reg [6:0] count = 0; // range 0 to 
-	
+	reg [6:0] count = 0; // range 0 to
+
 	assign sout = data[40];
-	
+
 	reg state = READY;
-	
+
 	wire packet_send_end;
 	assign packet_send_end = count == (41+3);
-	
+
 	reg data_retrieved_reg = 0;
 	assign data_retrieved = data_retrieved_reg | (in_data_valid & !has_buffer_data);
 
@@ -48,14 +51,14 @@ module Sender(
 					end else if (audio_sample_request_mode) begin
 						data[40] <= 1;
 						data[39:0] <= 40'h0700000000; // audio sample request packet
-					end else begin
+					end
+				end else begin
 						data[40] <= 0;
 						data[39:0] <= 0;
-					end
-					state <= SEND;
-					count <= 0;
 				end
-				
+				state <= SEND;
+				count <= 0;
+
 				if (in_data_valid) begin
 					if (has_buffer_data)
 						data_loss <= 1;
@@ -98,5 +101,5 @@ module Sender(
 			end
 		endcase
 	end
-	
+
 endmodule

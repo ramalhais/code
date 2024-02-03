@@ -165,9 +165,11 @@ void loop() {
     if (c == 'Q') {
       c = KEY_APOSTROPHE;
       modifiers = KD_RCOMM;
-    } else if (c == 0x0A) {
-      c = 0x2A;  // ENTER/RETURN
-    } else {
+    } 
+    // else if (c == 0x0A) {
+    //   c = 0x2A;  // ENTER/RETURN
+    // }
+     else {
 #define NEXT_KEY_A 0x39
       c = c - ('a' - NEXT_KEY_A);
     }

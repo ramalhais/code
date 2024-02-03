@@ -11,8 +11,9 @@ module next_kms
     output from_mon, // NeXT pin 5 (mono/color)
 
     // for Keyboard
-	input from_kb,
-	output to_kb
+    input from_kb,
+    output to_kb,
+    output [2:0] debug
 );
 
 
@@ -39,13 +40,13 @@ reg enable_next_keyboard = 1;
 
 reg [31:0] counter = 0;
 reg [5:0] led_buf = 6'b110011;
-reg [4:0] debug_test_pins;
 assign led[5:0] = ~led_buf[5:0];
 
 always@ (posedge clk) begin
     if (counter == 0) begin
+        led_buf[5] <= latest_keycode_valid;
         if (latest_keycode_valid) begin
-            led_buf[5] <= latest_keycode_valid;
+            // led_buf[5] <= latest_keycode_valid;
             led_buf[4:0] <= latest_keycode[4:0];
             // counter <= 32'd54000000;
             counter <= 32'd27000000;
@@ -95,7 +96,7 @@ NextSoundBox nextsb(
     volume_db,
     volume_db_valid,
     enable_next_keyboard,
-    debug_test_pins
+    debug
 );
 
 endmodule
