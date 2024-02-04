@@ -19,6 +19,7 @@ bool kb_found = false;
 #define KEYBOARD_COD 0x002540
 
 void btAdvertisedDeviceFound(BTAdvertisedDevice* pDevice) {
+// #include "esp_gap_bt_api.h"
 // esp_bt_cod_t *cod
 // cod->major), cod->minor, cod->service
 // cod->major == ESP_BT_COD_MAJOR_DEV_PERIPHERAL
