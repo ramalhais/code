@@ -1,0 +1,96 @@
+
+/* CSS */
+body { color: black; background: #4479A3; margin:24px; padding:0px; font-family:verdana,arial,helvetica,sans-serif; font-size: 10pt; }
+
+.maintext{
+	margin:0px; 
+	padding:5px;
+	width:100%;
+	vertical-align:top;			
+	}
+/*Text related tags*/
+	
+
+
+/* The top bar*/
+.table{
+	margin:0px; 
+	padding:0px;
+	width:640px; 
+	vertical-align:top;
+	background:white;			
+	}
+.topleft{
+	width:540px; 
+	height:61px;
+	margin:0px; 
+	padding:0px;
+	vertical-align:top;	
+	}
+.topslice{
+	width:100%; 
+	height:61px;
+	background-repeat:repeat-x;
+	background-image: url(/web/20150609032600im_/http://www.68k.org/~degs/images/top.slice.gif);
+	}
+.topright{
+	width:80px; 
+	height:61px;
+	margin:0px; 
+	padding:0px;
+	vertical-align:top;		
+	}
+
+td.sideleft{
+	width:46px; 
+	height:400px;
+	margin:0px; 
+	padding:0px;
+	vertical-align:top;	
+	background-image: url(/web/20150609032600im_/http://www.68k.org/~degs/images/side.left.gif);
+	background-repeat:repeat-y;
+	}
+img.sideleft{background-repeat:repeat-y;}
+td.sideright{
+	width:15px; 
+	height:400px; 
+	margin:0px; 
+	padding:0px;
+	vertical-align:top;
+	text-align:right;
+	background-image: url(/web/20150609032600im_/http://www.68k.org/~degs/images/side.right.gif);
+	background-repeat:repeat-y;
+	}
+img.sideright{background-repeat:repeat-y;};
+.middle{height:400px;}
+
+
+/* The bottom bar*/
+.bottomleft{width:540px; height:15px;}
+.bottomright{width:80px; height:15px;}
+.bottomslice{
+	width:100%; 
+	height:15px;
+	background-repeat:repeat-y;
+	}
+
+/*
+     FILE ARCHIVED ON 03:26:00 Jun 09, 2015 AND RETRIEVED FROM THE
+     INTERNET ARCHIVE ON 01:00:21 Feb 27, 2023.
+     JAVASCRIPT APPENDED BY WAYBACK MACHINE, COPYRIGHT INTERNET ARCHIVE.
+
+     ALL OTHER CONTENT MAY ALSO BE PROTECTED BY COPYRIGHT (17 U.S.C.
+     SECTION 108(a)(3)).
+*/
+/*
+playback timings (ms):
+  captures_list: 178.221
+  exclusion.robots: 0.104
+  exclusion.robots.policy: 0.091
+  cdx.remote: 0.077
+  esindex: 0.011
+  LoadShardBlock: 149.811 (3)
+  PetaboxLoader3.resolve: 103.046 (3)
+  PetaboxLoader3.datanode: 69.063 (4)
+  load_resource: 40.985
+*/

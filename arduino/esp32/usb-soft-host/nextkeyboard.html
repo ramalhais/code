@@ -1,0 +1,223 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!-- saved from url=(0085)https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html -->
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><script src="./nextkeyboard_files/analytics.js.download" type="text/javascript"></script>
+<script type="text/javascript">window.addEventListener('DOMContentLoaded',function(){var v=archive_analytics.values;v.service='wb';v.server_name='wwwb-app221.us.archive.org';v.server_ms=729;archive_analytics.send_pageview({});});</script>
+<script type="text/javascript" src="./nextkeyboard_files/bundle-playback.js.download" charset="utf-8"></script>
+<script type="text/javascript" src="./nextkeyboard_files/wombat.js.download" charset="utf-8"></script>
+<script type="text/javascript">
+  __wm.init("https://web.archive.org/web");
+  __wm.wombat("http://www.68k.org/~degs/nextkeyboard.html","20150608141822","https://web.archive.org/","web","/_static/",
+	      "1433773102");
+</script>
+<link rel="stylesheet" type="text/css" href="./nextkeyboard_files/banner-styles.css">
+<link rel="stylesheet" type="text/css" href="./nextkeyboard_files/iconochive.css">
+<!-- End Wayback Rewrite JS Include -->
+
+	
+	<link rel="stylesheet" type="text/css" href="./nextkeyboard_files/degs.css">
+	<title>index.html</title>
+	
+</head>
+<body><!-- BEGIN WAYBACK TOOLBAR INSERT -->
+<script>__wm.rw(0);</script>
+<div id="wm-ipp-base" lang="en" style="display: block; direction: ltr;">
+</div><div id="wm-ipp-print">The Wayback Machine - https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html</div>
+<script type="text/javascript">//<![CDATA[
+__wm.bt(700,27,25,2,"web","http://www.68k.org/~degs/nextkeyboard.html","20150608141822",1996,"/_static/",["/_static/css/banner-styles.css?v=S1zqJCYt","/_static/css/iconochive.css?v=qtvMKcIJ"], false);
+  __wm.rw(1);
+//]]></script>
+<!-- END WAYBACK TOOLBAR INSERT -->
+ 
+<table class="table" cellpadding="0" cellspacing="0" border="0">
+	<tbody><tr>
+	<td class="topleft"><img src="./nextkeyboard_files/top.left.gif" class="topleft" alt="" border="0"></td>
+	<td class="topslice"><img src="./nextkeyboard_files/top.slice.gif" alt="" class="topslice" border="0"></td>
+	<td class="topright"><img src="./nextkeyboard_files/top.right.gif" class="topright" alt="" border="0"></td>
+	</tr>
+</tbody></table>
+<table class="table" cellpadding="0" cellspacing="0" border="0">
+	<tbody><tr>
+	<td class="sideleft"><img src="./nextkeyboard_files/side.left.gif" class="sideleft" alt="" border="0"></td>
+	<td class="maintext">
+	<!--MAIN TEXT START  -->
+	
+
+
+
+
+<h1>NeXT keyboard bus</h1>
+
+<p>NeXT computer's non-adb bus hardware has been an annoyance for sometime to everyone
+whom is without documentation.  This makes everyone.  I dedicate this work to
+<a href="https://web.archive.org/web/20150608141822/http://moore.cx/">Dan Moore's</a> pile of NeXTStations; thanks again for the NeXT to probe.  <b>Disclaimer: </b>  I can guarantee none of this information
+to be correct.  These are my initial findings (as of 16 DEC 2003), and I won't bother to update this again until my playing is complete.  It only took me a day of playing to be able to use the keyboard
+to send signals to my Mac via my USB board.  I've also gotten the NeXT to accept emulated keyboard codes.  
+</p>
+
+<h3>Hardware Overview</h3>
+<p>
+A serial signal of a partially unknown protocol comes from the NeXT and returns to the NeXT.
+The board has some OP-AMPS for the MIC input and DAC.  The board also has a regulator which
+yields +5V for the keyboard/mouse combination.  The serial signals are all a +5V potential from
+GND. The serial signal enters a custom ASIC made by Motorola (XC38LG002PR01 made in the 13th week of 1990).
+<br>
+Attached to this custom ASIC are the following:<br>
+keyboard port (In/Out)<br>
+MC145503DW  (In, microphone PCM encoding)<br>
+SAA7320GP   (Out, DAC which uses the I2S serial bus)<br>
+PS3739      (mystery NeXT ASIC)<br>
+<br>
+</p>
+
+<h3>Monitor Bus Overview</h3>
+<p>
+The monitor bus connects the either the monitor or the sound-box to the NeXTStation.  This bus
+includes +12V and -12V  The serial clock for this bus is 20Mhz.  The data signal potential is
++5V.
+<br><br>
+<b>Input Bus:</b> Key-codes<br>
+The incoming signal contains the key presses, mouse and microphone data.  This bus idles at
+zero volts unless there is data to send.  It appears that a 
+packet format exists with control bits followed by data.  I'll describe this in detail when
+I have worked out all of the bits. The following signal
+is for a key-press of "a" with no other data.  The timing value of each "_" ASCII character is 200nS, ignore the "|"character.
+Due to the nature of ASCII art, I've put the unit count below the ticks.  (3 == 600ns)  
+(I initially thought that the complete packet takes 40 units, or 8uS, but there seems to be extra bits occasionally.  More on this quandary later.) 
+<br>
+</p><pre> ___     __      _             _         _   ___    _
+|   |___|  |____| |___________| |_______| |_|   |__| |
+  3   3   2   4  1      11     1     7   1 1  3   2 1
+                                        ^            ^
+                                        ---key code---
+                                        msb         lsb
+</pre>
+The last 8-bits are the key-code.  I believe the msb to be a marker-bit of sorts, because if you drop it you get the expected key code.
+Here is a partial list of key encodings.  One can extrapolate the rest by looking at the key encoding vectors.<br>
+<pre>  "a" 10111001  0xB9 (0x39)(see above timing example)
+  "s" 10111010  0xBA (0x3A)
+  "d" 10111011  0xBB (0x3B)
+  "f" 10111100  0xBC (0x3C)
+</pre>
+One should note that the key-codes which I determined correlate exactly to the key-map from the
+NeXTStep 3.3 developer documentation if the msb is indeed a marker-bit. (graphic below from channelu.com)<br>
+<img src="./nextkeyboard_files/non-adb-keyboard.gif">
+<br><br>
+<b>Input Bus:</b> Mouse<br>
+First, you must be aware that I have a spectacularly broken mouse.  
+Only the left mouse button, and the vertical vectoring work; however, I still acquired useful
+information from the mouse.  I initially thought this would be fine, but I couldn't even short the switch into functionality; so it goes.
+Again, the timing value of each "_" character is 200nS.
+<br>
+<br>
+Mouse up:
+<pre> ___     __          _                _         _   
+|   |___|  |________| |______________| |_______| |
+  3   3   2     8    1       15       1     7   1  
+</pre>
+<br>
+Mouse down:
+<pre> ___     __          _                _            
+|   |___|  |________| |______________| |_________
+  3   3   2     8    1       15       1     8  
+</pre>
+<br>
+Scroll up:
+<pre> ___     __          _         ________         _       
+|   |___|  |________| |_______|        |_______| |
+  3   3   2     8    1    7       8       7     1 
+</pre>
+<br>
+Scroll down:
+<pre> ___     __          _                __         _       
+|   |___|  |________| |______________|  |_______| |
+  3   3   2     8    1       14       2    7     1 
+</pre>
+
+<br>
+<b>Input Bus:</b> Microphone<br>
+Not yet finished.<br>
+<br>
+<p></p>
+
+<h3>Keyboard Bus Overview</h3>
+<p>
+The keyboard bus consists of 5 wires: GND, +5V, power on, serial in, serial out.<br>
+The keyboard bus is odd because it doesn't have a clock, so I'm assuming that it's internal.
+The smallest significant unit of time seems to put the clock at 10Khz.  The
+keyboard contains one Motorola S38DC007PP01, and some de-bounce circuitry so you don't blow it
+up when you plug in the mouse.  The input and output serial lines are always active with repeated
+packet activity.<br><br>
+
+<b>Output Bus:</b> Idle State<br>
+The output bus has a stead, repeating signal which I believe to be an empty packet.  I'm confident that
+this is the carrier for the I2S data for the DAC.  Especially because there's 125uS in total for the packet.
+ Again, the timing below is 200nS for each "_".<br><br> 
+The timing value of each "_" ASCII character is 50uS, ignore the "|"character.
+<br>
+Output Idle Signal:
+</p><pre> ____________            __             ____________   
+             |__________|  |___________|           
+      12           10     2      10          12
+</pre>
+Unlike the monitor bus, bits are placed on the bus lsb first.  For example, the key coding for
+"a" is 0x39, which follows below.  "*" denotes a start/stop bit.
+<br>
+0x39 "a":
+<pre> ____________   _    ___   _   _           _   ____________  
+             |_| |__|   |_| |_| |_________| |_|           
+      12      1 1  2  3  1 1 1 1     9     1 1      12
+              * 1 00 111 0 1 0 1      
+</pre>
+If you turn around binary 10011101, you get 10111001, which is 0xB9; drop the MSB, you get 0x39 which is our key board "a".
+<br>
+0x3B "d":
+<pre> ____________   __   ___   _   _           _   ____________ 
+             |_|  |_|   |_| |_| |_________| |_|           
+      12      1  2 1  3  1 1 1 1     9     1 1      12
+              * 11 0 111 0 1 0 1      
+</pre>
+<br>
+Scroll up:
+<pre> ____________   _           _   __         ____________ 
+             |_| |_________| |_|  |_______|           
+      12      1 1     9     1 1  2    7        12
+                   
+</pre>
+Scroll down:
+<pre> ____________   _           _   ________   ____________ 
+             |_| |_________| |_|        |_|           
+      12      1 1     9     1 1     8    1   12
+                   
+</pre>
+The keyboard input signal is composed to two alternating signal forms.  Again, the timing value of each "_" ASCII character is 50uS.
+<br>
+Input Idle Signal:
+<pre>    _     _     __...__       _     __...__ 
+ |_| |___| |___|       |_____| |___|           
+  1 1  3  1  3     35     5   1  3     35
+</pre>
+<p></p>
+
+If you have any questions, please feel free to email me at "degs at the domain of 68k with a dot and an org".
+ 
+
+	
+	
+	
+	
+	<!--MAIN TEXT END  -->
+	</td>
+	<td class="sideright"><img src="./nextkeyboard_files/side.right.gif" class="sideright" alt="" border="0"></td>
+	</tr>
+</tbody></table>
+<table class="table" cellpadding="0" cellspacing="0" border="0">
+	<tbody><tr>
+	<td class="bottomleft"><img src="./nextkeyboard_files/bottom.left.gif" class="bottomleft" alt="" border="0"></td>
+	<td class="bottomslice"><img src="./nextkeyboard_files/bottom.slice.gif" alt="" class="bottomslice" border="0"></td>
+	<td class="bottomright"><img src="./nextkeyboard_files/bottom.right.gif" class="bottomright" alt="" border="0"></td>
+	</tr>
+</tbody></table>
+
+
+
+</body></html>
