@@ -19,6 +19,12 @@ bool kb_found = false;
 #define KEYBOARD_COD 0x002540
 
 void btAdvertisedDeviceFound(BTAdvertisedDevice* pDevice) {
+// esp_bt_cod_t *cod
+// cod->major), cod->minor, cod->service
+// cod->major == ESP_BT_COD_MAJOR_DEV_PERIPHERAL
+// ("major: %s, minor: %d, service: 0x%03x", esp_hid_cod_major_str(cod->major), cod->minor, cod->service);
+// esp_hid_usage_from_cod((uint32_t)cod);
+
   if (pDevice->getCOD() == KEYBOARD_COD) {
     kb_address = pDevice->getAddress();
     kb_found = true;
