@@ -35,7 +35,7 @@ module NextSoundBox (
     output [2:0] debug
 );
 
-assign debug = {out_valid,out_data_retrieved,keyboard_data_ready};
+    assign debug = {out_valid,out_data_retrieved,keyboard_data_ready};
 
     // dummy
     // assign spdif_led0 = from_mon;
