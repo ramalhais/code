@@ -1,3 +1,5 @@
+// Needs Arduino board esp32 <= 2.0.11 selected in boards manager, for ESP32-USB-Soft-Host to work
+
 //#define FORCE_TEMPLATED_NOPS
 #include <ESP32-USB-Soft-Host.h>
 //#include "usbkbd.h" // KeyboardReportParser
@@ -41,27 +43,6 @@ char sendCmdAposRelease[] = { 0b11100011, 0b00001000, 0b00000000, KD_VALID, KEY_
 #define DM_P3  -1 // 15. -1 to disable
 
 // USB Soft Host stuff
-static void my_USB_DetectCB( uint8_t usbNum, void * dev )
-{
-  sDevDesc *device = (sDevDesc*)dev;
-  printf("New device detected on USB#%d\n", usbNum);
-  printf("desc.bcdUSB             = 0x%04x\n", device->bcdUSB);
-  printf("desc.bDeviceClass       = 0x%02x\n", device->bDeviceClass);
-  printf("desc.bDeviceSubClass    = 0x%02x\n", device->bDeviceSubClass);
-  printf("desc.bDeviceProtocol    = 0x%02x\n", device->bDeviceProtocol);
-  printf("desc.bMaxPacketSize0    = 0x%02x\n", device->bMaxPacketSize0);
-  printf("desc.idVendor           = 0x%04x\n", device->idVendor);
-  printf("desc.idProduct          = 0x%04x\n", device->idProduct);
-  printf("desc.bcdDevice          = 0x%04x\n", device->bcdDevice);
-  printf("desc.iManufacturer      = 0x%02x\n", device->iManufacturer);
-  printf("desc.iProduct           = 0x%02x\n", device->iProduct);
-  printf("desc.iSerialNumber      = 0x%02x\n", device->iSerialNumber);
-  printf("desc.bNumConfigurations = 0x%02x\n", device->bNumConfigurations);
-  // if( device->iProduct == mySupportedIdProduct && device->iManufacturer == mySupportedManufacturer ) {
-  //   myListenUSBPort = usbNum;
-  // }
-}
-
 #define HID_INTERFACE_PROTO_KEYBOARD 1
 #define HID_INTERFACE_PROTO_MOUSE 2
 #define APP_USBD_HID_SUBCLASS_BOOT 1
@@ -351,6 +332,7 @@ void loop() {
         }
       } else {
         sendKey(0, false, 0);
+//        sendIdle();
       }
     } else if ((result & 0x1FF) == 0b000100010) {
       Serial.printf("M");
@@ -361,6 +343,7 @@ void loop() {
       // Only if mouse moved or button pressed
       //sendMouse(mousex, mousey, button1, button2);
       sendKey(0, false, 0);
+      //sendIdle();
     } else if ((result & 0x3FFFFF) == 0b0000000000111111011110) {
       Serial.println("\nRESET");
     } else if ((result & 0x1FFF) == 0b0111000000000) {
@@ -392,8 +375,38 @@ void loop() {
       //
     }
   } else {
-    //Serial.print("X");
+    Serial.print("X");
   }
+}
+
+static inline void sendIdle() {
+  cli();
+
+  // Start bit
+  out_lo_delay(1);
+
+  // 8 bit data
+  out_lo_delay(8);
+
+  // C/D (Command/Data) = 0 (Data). If no data, send 1 (Command) and data all zeroes
+  out_hi_delay(1);
+
+  // Stop bit
+  out_hi_delay(1);
+
+  // Start bit
+  out_lo_delay(1);
+
+  // 8 bit data
+  out_lo_delay(8);
+
+  // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
+  out_hi_delay(1);
+
+  // Stop bit
+  out_hi_delay(1);
+
+  sei();
 }
 
 static inline void sendKey(char key, bool pressed, char modifiers) {
@@ -433,23 +446,30 @@ static inline void sendKey(char key, bool pressed, char modifiers) {
 static inline void sendMouse(char mousex, char mousey, bool button1, bool button2) {
   cli();
 
-  out_lo_delay(1);  // fixed 0
+  out_lo_delay(1);
 
   out_delay(!button1);
   for (int bit = 0; bit <= 6; bit++)
     out_delay((~mousex) & (1 << bit));
 
-  out_lo_delay(1);  // fixed 0
-  out_hi_delay(1);  // fixed 1
-  out_hi_delay(1);  // fixed 1 ?? are you sure drakware?
-  out_lo_delay(1);  // fixed 0
+  // C/D (Command/Data) = 0 (Data). If no data, send 1 (Command) and data all zeroes
+  out_delay(!(mousex || mousey || button1 || button2));
+
+  // Stop bit
+  out_hi_delay(1);
+
+  // Start bit
+  out_lo_delay(1);
 
   out_delay(!button2);
   for (int bit = 0; bit <= 6; bit++)
     out_delay((~mousey) & (1 << bit));
 
-  out_lo_delay(1);  // fixed 0
+  // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
+  out_delay(!(mousex || mousey || button1 || button2));
 
-  out_hi_delay(12);  // OFF high
+  // Stop bit
+  out_hi_delay(1);
+
   sei();
 }
