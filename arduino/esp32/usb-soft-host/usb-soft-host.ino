@@ -2,7 +2,11 @@
 #define FORCE_TEMPLATED_NOPS
 #include <ESP32-USB-Soft-Host.h>
 #include "usbkbd.h" // KeyboardReportParser
-
+#include "usb_host.h"
+#include "USB.h"
+#include "USBHIDKeyboard.h" // Keybo
+//USBHIDKeyboard Keyboard;
+#include "driver/timer.h"
 
 #if defined ARDUINO_LOLIN_D32_PRO
   // [KO] 15/13 : unassigned pins seem unresponsive
@@ -79,12 +83,18 @@
   #define PROFILE_NAME "Default Wroom"
   #define DP_P0  16  // always enabled
   #define DM_P0  17  // always enabled
-  #define DP_P1  22 // -1 to disable
-  #define DM_P1  23 // -1 to disable
-  #define DP_P2  18 // -1 to disable
-  #define DM_P2  19 // -1 to disable
-  #define DP_P3  13 // -1 to disable
-  #define DM_P3  15 // -1 to disable
+  #define DP_P1  -1 // -1 to disable
+  #define DM_P1  -1 // -1 to disable
+  #define DP_P2  -1 // -1 to disable
+  #define DM_P2  -1 // -1 to disable
+  #define DP_P3  -1 // -1 to disable
+  #define DM_P3  -1 // -1 to disable
+  // #define DP_P1  22 // -1 to disable
+  // #define DM_P1  23 // -1 to disable
+  // #define DP_P2  18 // -1 to disable
+  // #define DM_P2  19 // -1 to disable
+  // #define DP_P3  13 // -1 to disable
+  // #define DM_P3  15 // -1 to disable
 #endif
 
 
@@ -132,6 +142,7 @@ usb_pins_config_t USB_Pins_Config =
 void setup()
 {
   Serial.begin(115200);
+  Serial.printf("getCpuFrequencyMhz=%d TIMER_BASE_CLK=%d\n", getCpuFrequencyMhz(), TIMER_BASE_CLK);
   delay(5000);
   Serial.printf("USB Soft Host Test for %s\n", PROFILE_NAME );
   Serial.printf("TIMER_BASE_CLK: %d, TIMER_DIVIDER:%d, TIMER_SCALE: %d\n", TIMER_BASE_CLK, TIMER_DIVIDER, TIMER_SCALE );
