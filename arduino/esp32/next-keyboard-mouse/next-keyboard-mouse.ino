@@ -282,9 +282,9 @@ void setup() {
 
   // USB Soft Host
 //  USH.init( USB_Pins_Config, my_USB_DetectCB, my_USB_PrintCB );
-  USH.init(USB_Pins_Config, NULL, NULL);
-  USH.setPrintCb(ush_handle_data);
-  USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
+  // USH.init(USB_Pins_Config, NULL, NULL);
+  // USH.setPrintCb(ush_handle_data);
+  // USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
 
   pinMode(PIN_TO_KBD, INPUT_PULLUP);
   pinMode(PIN_FROM_KBD, OUTPUT);
@@ -308,7 +308,7 @@ void loop() {
       modifiers = KD_RCOMM;
     } 
     else if (c == 0x0A) {
-    //   c = 0x2A;  // ENTER/RETURN
+      c = 0x2A;  // ENTER/RETURN
     }
      else {
 #define NEXT_KEY_A 0x39
@@ -331,8 +331,7 @@ void loop() {
           modifiers = 0;
         }
       } else {
-        sendKey(0, false, 0);
-//        sendIdle();
+        sendIdle();
       }
     } else if ((result & 0x1FF) == 0b000100010) {
       Serial.printf("M");
@@ -342,8 +341,7 @@ void loop() {
       bool button2 = false;
       // Only if mouse moved or button pressed
       //sendMouse(mousex, mousey, button1, button2);
-      sendKey(0, false, 0);
-      //sendIdle();
+      sendIdle();
     } else if ((result & 0x3FFFFF) == 0b0000000000111111011110) {
       Serial.println("\nRESET");
     } else if ((result & 0x1FFF) == 0b0111000000000) {
@@ -403,7 +401,7 @@ static inline void sendIdle() {
   // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
   out_hi_delay(1);
 
-  // Stop bit
+  // Stop
   out_hi_delay(1);
 
   sei();
@@ -437,7 +435,7 @@ static inline void sendKey(char key, bool pressed, char modifiers) {
   // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
   out_delay(!(key || modifiers));
 
-  // Stop bit
+  // Stop
   out_hi_delay(1);
 
   sei();
@@ -468,7 +466,7 @@ static inline void sendMouse(char mousex, char mousey, bool button1, bool button
   // C/D (Command/Data) = 0 (Data). If not data, send 1 (Command) and data all zeroes
   out_delay(!(mousex || mousey || button1 || button2));
 
-  // Stop bit
+  // Stop
   out_hi_delay(1);
 
   sei();
