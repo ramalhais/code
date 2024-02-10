@@ -1,7 +1,7 @@
 `default_nettype none
 
 module Keyboard(
-	input wire clk, // mon clk
+	input wire clk, // fpga clk27
 	input wire led_data_valid,
 	input wire [1:0] led_data_in,
 	output reg data_available_ = 0,

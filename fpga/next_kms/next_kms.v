@@ -41,6 +41,7 @@ reg enable_next_keyboard = 1;
 reg [31:0] counter = 0;
 reg [5:0] led_buf = 6'b110011;
 assign led[5:0] = ~led_buf[5:0];
+wire [2:0] debug_nextsb;
 
 always@ (posedge clk) begin
     if (counter == 0) begin
@@ -52,11 +53,11 @@ always@ (posedge clk) begin
             counter <= 32'd27000000;
             // counter <= 32'd06750000;
             // counter <= 1;
-        end //else begin
+        end else begin
         //     led_buf[5] <= latest_keycode_valid;
-        //     led_buf[4:0] <= debug_test_pins;
-        //     counter <= 32'd06750000;
-        // end
+             led_buf[2:0] <= debug_nextsb;
+             counter <= 32'd06750000;
+        end
     end else begin
         counter <= counter-1;
     end
@@ -96,7 +97,7 @@ NextSoundBox nextsb(
     volume_db,
     volume_db_valid,
     enable_next_keyboard,
-    debug
+    debug_nextsb
 );
 
 endmodule
