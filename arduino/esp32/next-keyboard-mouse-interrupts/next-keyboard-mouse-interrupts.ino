@@ -5,8 +5,30 @@
 #define PIN_TO_KBD 32    // Input to this keyboard
 #define PIN_FROM_KBD 33  // Output from this keyboard
 
+// USB Soft Host Pins
+#define DP_P0  16  // D+
+#define DM_P0  17  // D-
+#define DP_P1  -1 // 22. -1 to disable
+#define DM_P1  -1 // 23. -1 to disable
+#define DP_P2  -1 // 18. -1 to disable
+#define DM_P2  -1 // 19. -1 to disable
+#define DP_P3  -1 // 13. -1 to disable
+#define DM_P3  -1 // 15. -1 to disable
+
+// NeXT Mouse mini-DIN 8pin: https://deskthority.net/wiki/Bus_mouse#NeXT_.28non-ADB.29
+// 8pin mini-DIN. pin1 = 5V. pin8 = GND
+#define NX_MOUSE_XA_PIN 18 // pin 2
+#define NX_MOUSE_XB_PIN 19 // pin 3
+#define NX_MOUSE_YA_PIN 21 // pin 4
+#define NX_MOUSE_YB_PIN 25 // pin 5
+#define NX_MOUSE_RIGHT_PIN 26 // pin 6
+#define NX_MOUSE_LEFT_PIN 27 // pin 7
+
+#define NX_MOUSE_SAMPLING_MS 5 // milliseconds
+
 // https://github.com/tmk/tmk_keyboard/issues/704
-#define NEXT_KBD_TIMING_US 52 // *microseconds
+// #define NEXT_KBD_TIMING_US 52 // *microseconds
+// #define NEXT_KBD_TIMING_US 53 // *microseconds
 //#define NEXT_KBD_TIMING_100NS 527 // *100nanoseconds. should be 52.75 for NeXT KMS, but our KMS is 53microseconds
 #define NEXT_KBD_TIMING_100NS 530 // *100nanoseconds. should be 52.75 for NeXT KMS, but our FPGA KMS is 53microseconds
 
@@ -20,6 +42,10 @@
 #define KMS_LED_PREFIX 0b0111000000000
 #define KMS_LED_LEFT_MASK 0x2000
 #define KMS_LED_RIGHT_MASK 0x4000
+
+// NeXT keycodes:
+// https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
+// https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
 
 // Not apostrophe, it's tilde or backtick or grave
 #define KEY_APOSTROPHE 0x26  // 0b00100110
@@ -133,16 +159,6 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR timer1_write_handler() {
     timerAttachInterrupt(timer1, &timer1_read_handler, false);
   }
 }
-
-// USB Soft Host Pins
-#define DP_P0  16  // D+
-#define DM_P0  17  // D-
-#define DP_P1  -1 // 22. -1 to disable
-#define DM_P1  -1 // 23. -1 to disable
-#define DP_P2  -1 // 18. -1 to disable
-#define DM_P2  -1 // 19. -1 to disable
-#define DP_P3  -1 // 13. -1 to disable
-#define DM_P3  -1 // 15. -1 to disable
 
 // USB Soft Host stuff
 #define HID_INTERFACE_PROTO_KEYBOARD 1

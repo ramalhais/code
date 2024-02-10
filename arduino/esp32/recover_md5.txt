@@ -1,0 +1,1 @@
+ ~/AppData/Local/Arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.exe write_flash_status --non-volatile 0
