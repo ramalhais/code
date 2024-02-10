@@ -282,9 +282,9 @@ void setup() {
 
   // USB Soft Host
 //  USH.init( USB_Pins_Config, my_USB_DetectCB, my_USB_PrintCB );
-  // USH.init(USB_Pins_Config, NULL, NULL);
-  // USH.setPrintCb(ush_handle_data);
-  // USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
+  USH.init(USB_Pins_Config, NULL, NULL);
+  USH.setPrintCb(ush_handle_data);
+  USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
 
   pinMode(PIN_TO_KBD, INPUT_PULLUP);
   pinMode(PIN_FROM_KBD, OUTPUT);
@@ -364,13 +364,6 @@ void loop() {
       print_byte((result >> 8) & 0xff);
       print_byte(result & 0xff);
       Serial.println("");
-      //      Serial.printf("?");
-      // 00000000.00000110.01100010.
-      // 00000000.00000110.01100000.
-      // 00000000.00000110.01100110.
-      // 00000000.00000110.01100100.
-      // 00111111.11111110.00000000.
-      //
     }
   } else {
     Serial.print("X");
