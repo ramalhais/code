@@ -172,17 +172,19 @@ void next_mouse_init(hw_timer_t **next_mouse_timer) {
 }
 
 // https://github.com/tmk/tmk_keyboard/issues/704
+// Also: ASIC pdf says the clock is 18958Hz. 1/18958 = 0.00005274818 with 2% tolerance: (~ 51.72 - 52.75 - 53.80 microseconds)
 // #define NEXT_KBD_TIMING_US 52 // *microseconds
 // #define NEXT_KBD_TIMING_US 53 // *microseconds
 //#define NEXT_KEYBOARD_TIMING_100NS 527 // *100nanoseconds. should be 52.75 for NeXT KMS, but our KMS is 53microseconds
 #define NEXT_KEYBOARD_TIMING_100NS 530 // *100nanoseconds. should be 52.75 for NeXT KMS, but our FPGA KMS is 53microseconds
 #define NEXT_KEYBOARD_TIMER_NR 1
 
+// packets from LSB(right) to MSB(left). start (low) bit, byte data, command(high)/data(low) bit, stop (high) bit
 #define NEXT_KEYBOARD_QUERY_MASK 0x1FF
 #define NEXT_KEYBOARD_QUERY_KEYBOARD 0b000100000
 #define NEXT_KEYBOARD_QUERY_MOUSE 0b000100010
 #define NEXT_KEYBOARD_RESET_MASK 0x3FFFFF
-#define NEXT_KEYBOARD_RESET 0b0000000000111111011110
+#define NEXT_KEYBOARD_RESET 0b0000000000111111011110 // byte data bit 4, when 0, means it's a write command
 #define NEXT_KEYBOARD_LED_MASK 0x1FFF
 #define NEXT_KEYBOARD_LED 0b0111000000000
 #define NEXT_KEYBOARD_LED_LEFT_MASK 0x2000
