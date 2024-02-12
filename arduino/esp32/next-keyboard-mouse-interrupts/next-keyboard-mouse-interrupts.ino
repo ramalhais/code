@@ -51,10 +51,12 @@ ADebouncer next_mouse_left_debouncer, next_mouse_right_debouncer;
 inline void next_mouse_read_pins() {
   data_old = data;
 
-  data.xa = !digitalRead(NEXT_MOUSE_XA_PIN);
-  data.xb = !digitalRead(NEXT_MOUSE_XB_PIN);
-  data.ya = !digitalRead(NEXT_MOUSE_YA_PIN);
-  data.yb = !digitalRead(NEXT_MOUSE_YB_PIN);
+  // We can ignore the signal on these pins, because what matters is the quadratic encoding changes
+  data.xa = digitalRead(NEXT_MOUSE_XA_PIN);
+  data.xb = digitalRead(NEXT_MOUSE_XB_PIN);
+  data.ya = digitalRead(NEXT_MOUSE_YA_PIN);
+  data.yb = digitalRead(NEXT_MOUSE_YB_PIN);
+
   data.right = next_mouse_right_debouncer.debounce(!digitalRead(NEXT_MOUSE_RIGHT_PIN));
   data.left = next_mouse_left_debouncer.debounce(!digitalRead(NEXT_MOUSE_LEFT_PIN));
 }
@@ -70,24 +72,6 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_mouse_read_interrupt() {
     next_mouse_handle_changes();
     next_mouse_changed = true; // Used for printing changes
   }
-}
-
-void next_mouse_init(hw_timer_t **next_mouse_timer) {
-  pinMode(NEXT_MOUSE_XA_PIN, INPUT_PULLUP);
-  pinMode(NEXT_MOUSE_XB_PIN, INPUT_PULLUP);
-  pinMode(NEXT_MOUSE_YA_PIN, INPUT_PULLUP);
-  pinMode(NEXT_MOUSE_YB_PIN, INPUT_PULLUP);
-  pinMode(NEXT_MOUSE_RIGHT_PIN, INPUT_PULLUP);
-  pinMode(NEXT_MOUSE_LEFT_PIN, INPUT_PULLUP);
-
-  next_mouse_left_debouncer.mode(DELAYED, NEXT_MOUSE_DEBOUNCE_PERIOD_MS, LOW); // We invert the signal, so unpressed button should be LOW
-  next_mouse_right_debouncer.mode(DELAYED, NEXT_MOUSE_DEBOUNCE_PERIOD_MS, LOW);
-
-  *next_mouse_timer = timerBegin(NEXT_MOUSE_TIMER_NR, DIVIDER_100NS, true);
-  timerAttachInterrupt(*next_mouse_timer, &next_mouse_read_interrupt, false);
-  timerAlarmWrite(*next_mouse_timer, NEXT_MOUSE_TIMING_100NS, true);
-  timerSetAutoReload(*next_mouse_timer, true);
-  timerAlarmEnable(*next_mouse_timer);
 }
 
 // int quadratic_decoder[16] = {
@@ -112,19 +96,20 @@ void next_mouse_init(hw_timer_t **next_mouse_timer) {
 
 #define QUADRATIC_DECODER_BITS 0b0100000110000010;
 
-void next_mouse_handle_changes() {
-  int dx, dy, button_left, button_right;
+inline void next_mouse_handle_changes() {
+  int dx = 0, dy = 0;
+  bool button_left = 0, button_right = 0;
 
   if (data.xa != data_old.xa || data.xb != data_old.xb) {
     int index = (data_old.xa<<3) | (data_old.xb<<2) | (data.xa<<1) | data.xb;
     int left = (1<<index) & QUADRATIC_DECODER_BITS; // should be right when true, but somehow it's left? even tried reading inverted signal
-    dx += left ? -1 : 1;
+    dx = left ? -1 : 1;
   }
 
   if (data.ya != data_old.ya || data.yb != data_old.yb) {
     int index = (data_old.ya<<3) | (data_old.yb<<2) | (data.ya<<1) | data.yb;
     int up = (1<<index) & QUADRATIC_DECODER_BITS; // should be down when true, but somehow it's up? even tried reading inverted signal
-    dy += up ? -1 : 1;
+    dy = up ? -1 : 1;
   }
 
   if (data.right != data_old.right) {
@@ -135,33 +120,55 @@ void next_mouse_handle_changes() {
     button_left = data.left;
   }
 
-  queue_mouse(dx, dy, button_left, button_right);
+  queue_mouse_from_interrupt(dx, dy, button_left, button_right);
 }
 
 void next_mouse_print_changes() {
+  if (!next_mouse_changed) {
+    return;
+  }
+
   if (data.xa != data_old.xa || data.xb != data_old.xb) {
     int index = (data_old.xa<<3) | (data_old.xb<<2) | (data.xa<<1) | data.xb;
     int left = (1<<index) & QUADRATIC_DECODER_BITS;
     // printf("\nGoing %s. index=%d. %d %d %d %d\n", left ? "left" : "right", index, data_old.xa, data_old.xb, data.xa, data.xb);
-    printf("\nNeXT Mouse: %s\n", left ? "left" : "right");
+    Serial.printf("\nNeXT Mouse: %s\n", left ? "left" : "right");
   }
 
   if (data.ya != data_old.ya || data.yb != data_old.yb) {
     int index = (data_old.ya<<3) | (data_old.yb<<2) | (data.ya<<1) | data.yb;
     int up = (1<<index) & QUADRATIC_DECODER_BITS;
     // printf("\nGoing %s. index=%d. %d %d %d %d\n", up ? "up" : "down", index, data_old.ya, data_old.yb, data.ya, data.yb);
-    printf("\nNeXT Mouse: %s\n", up ? "up" : "down");
+    Serial.printf("\nNeXT Mouse: %s\n", up ? "up" : "down");
   }
 
   if (data.right != data_old.right) {
-    printf("\nNeXT Mouse: right button %s\n", data.right ? "pressed" : "released");
+    Serial.printf("\nNeXT Mouse: right button %s\n", data.right ? "pressed" : "released");
   }
 
   if (data.left != data_old.left) {
-    printf("\nNeXT Mouse: left button %s\n", data.left ? "pressed" : "released");
+    Serial.printf("\nNeXT Mouse: left button %s\n", data.left ? "pressed" : "released");
   }
 
   next_mouse_changed = false;
+}
+
+void next_mouse_init(hw_timer_t **next_mouse_timer) {
+  pinMode(NEXT_MOUSE_XA_PIN, INPUT_PULLUP);
+  pinMode(NEXT_MOUSE_XB_PIN, INPUT_PULLUP);
+  pinMode(NEXT_MOUSE_YA_PIN, INPUT_PULLUP);
+  pinMode(NEXT_MOUSE_YB_PIN, INPUT_PULLUP);
+  pinMode(NEXT_MOUSE_RIGHT_PIN, INPUT_PULLUP);
+  pinMode(NEXT_MOUSE_LEFT_PIN, INPUT_PULLUP);
+
+  next_mouse_left_debouncer.mode(DELAYED, NEXT_MOUSE_DEBOUNCE_PERIOD_MS, HIGH);
+  next_mouse_right_debouncer.mode(DELAYED, NEXT_MOUSE_DEBOUNCE_PERIOD_MS, HIGH);
+
+  *next_mouse_timer = timerBegin(NEXT_MOUSE_TIMER_NR, DIVIDER_100NS, true);
+  timerAttachInterrupt(*next_mouse_timer, &next_mouse_read_interrupt, false);
+  timerAlarmWrite(*next_mouse_timer, NEXT_MOUSE_TIMING_100NS, true);
+  timerSetAutoReload(*next_mouse_timer, true);
+  timerAlarmEnable(*next_mouse_timer);
 }
 
 // https://github.com/tmk/tmk_keyboard/issues/704
@@ -193,15 +200,6 @@ void next_mouse_print_changes() {
 #define NEXT_KEYBOARD_MOUSE_X_START_BIT (NEXT_KEYBOARD_MOUSE_BUTTON1_BIT+1)
 #define NEXT_KEYBOARD_MOUSE_BUTTON2_BIT 12
 #define NEXT_KEYBOARD_MOUSE_Y_START_BIT (NEXT_KEYBOARD_MOUSE_BUTTON2_BIT+1)
-
-// NeXT keycodes:
-// https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
-// https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
-
-// Not apostrophe, it's tilde or backtick or grave
-#define KEY_APOSTROPHE 0x26  // 0b00100110
-#define KD_RCOMM 0x10 // Right Command
-#define NEXT_KEY_A 0x39
 
 hw_timer_t *next_keyboard_timer;
 hw_timer_t *next_mouse_timer;
@@ -327,8 +325,8 @@ void ush_handle_interface_descriptor(uint8_t ref, int cfgCount, int sIntfCount, 
 #define USB_MOUSE_BUTTON_LEFT_MASK   1<<0
 #define USB_MOUSE_BUTTON_RIGHT_MASK  1<<1
 #define USB_MOUSE_BUTTON_MIDDLE_MASK 1<<2
-#define USB_MOUSE_SCROLL_UP    0x1
-#define USB_MOUSE_SCROLL_DOWN  0xff
+#define USB_MOUSE_SCROLL_UP    1
+#define USB_MOUSE_SCROLL_DOWN  -1
 typedef struct {
   uint8_t byte0;  // Always 0x1
   uint8_t button; // 1=left,2=right,4=middle
@@ -345,77 +343,271 @@ typedef struct {
   int8_t scroll; // 1==up 0xff==down
 } usb_mouse_data_4bytes_t; // Microsoft Wheel Mouse Optical 1.1A USB and PS/2 Compatible
 
-// char ascii2next[] = {
-//   [8] = NEXT_BACKSPACE,
-//   NEXT_TAB,
-//   NEXT_ENTER,
-//   [27] = NEXT_ESCAPE,
-//   [32] = NEXT_SPACE,
-//   NEXT_EXCLAMATION,
-//   NEXT_DOUBLE_QUOTES,
-//   NEXT_NUMBER_SIGN, // hash
-//   NEXT_DOLLAR,
-//   NEXT_PERCENT
+// NeXT keycodes:
+// https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
+// https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
 
-// };
+uint16_t ascii2next[256];
+
+// Modifiers
+#define KD_CNTL 0x01
+#define KD_LSHIFT 0x02
+#define KD_RSHIFT 0x04
+#define KD_LCOMM 0x08
+#define KD_RCOMM 0x10
+#define KD_LALT 0x20
+#define KD_RALT 0x40
+
+// Keys
+#define NEXT_KEY_NO_KEY 0
+#define NEXT_KEY_BACKSPACE 0x1B
+#define NEXT_KEY_HORIZONTAL_TAB 0x41
+#define NEXT_KEY_ENTER 0x2A
+#define NEXT_KEY_ESCAPE 0x49
+#define NEXT_KEY_SPACE 0x38
+#define NEXT_KEY_EXCLAMATION 0x4A|KD_LSHIFT<<8
+#define NEXT_KEY_DOUBLE_QUOTES 0x2B|KD_LSHIFT<<8
+#define NEXT_KEY_NUMBER_SIGN 0x4C|KD_LSHIFT<<8// hash
+#define NEXT_KEY_DOLLAR 0x4D|KD_LSHIFT<<8
+#define NEXT_KEY_PERCENT 0x50|KD_LSHIFT<<8
+#define NEXT_KEY_AMPERSAND 0x4E|KD_LSHIFT<<8
+#define NEXT_KEY_SINGLE_QUOTE 0x2B|KD_LSHIFT<<8
+#define NEXT_KEY_LEFT_PARENTHESIS 0x1F|KD_LSHIFT<<8
+#define NEXT_KEY_RIGHT_PARENTHESIS 0x20|KD_LSHIFT<<8
+#define NEXT_KEY_ASTERISK 0x1E|KD_LSHIFT<<8
+#define NEXT_KEY_PLUS 0x1C|KD_LSHIFT<<8
+#define NEXT_KEY_COMMA 0x2E|KD_LSHIFT<<8
+#define NEXT_KEY_MINUS 0x1D
+#define NEXT_KEY_PERIOD 0x2F
+#define NEXT_KEY_SLASH 0x30
+#define NEXT_KEY_ZERO 0x20
+#define NEXT_KEY_ONE 0x4A
+#define NEXT_KEY_TWO 0x4B
+#define NEXT_KEY_THREE 0x4C
+#define NEXT_KEY_FOUR 0x4D
+#define NEXT_KEY_FIVE 0x50
+#define NEXT_KEY_SIX 0x4F
+#define NEXT_KEY_SEVEN 0x4E
+#define NEXT_KEY_EIGHT 0x1E
+#define NEXT_KEY_NINE 0x1F
+#define NEXT_KEY_COLON 0x2C|KD_LSHIFT<<8
+#define NEXT_KEY_SEMICOLON 0x2C
+#define NEXT_KEY_LESS_THAN 0x2E|KD_LSHIFT<<8
+#define NEXT_KEY_EQUALS 0x1C
+#define NEXT_KEY_GREATER_THAN 0x2F|KD_LSHIFT<<8
+#define NEXT_KEY_QUESTION_MARK 0x30|KD_LSHIFT<<8
+#define NEXT_KEY_AT_SIGN 0x4B|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_A 0x39|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_B 0x35|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_C 0x33|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_D 0x3B|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_E 0x44|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_F 0x3C|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_G 0x3D|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_H 0x40|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_I 0x06|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_J 0x3F|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_K 0x3E|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_L 0x2D|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_M 0x36|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_N 0x37|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_O 0x07|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_P 0x08|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_Q 0x42|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_R 0x45|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_S 0x3A|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_T 0x48|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_U 0x46|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_V 0x34|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_W 0x43|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_X 0x32|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_Y 0x47|KD_LSHIFT<<8
+#define NEXT_KEY_UPPERCASE_Z 0x31|KD_LSHIFT<<8
+#define NEXT_KEY_OPENING_BRACKET 0x05
+#define NEXT_KEY_BACKSLASH 0x28|KD_LSHIFT<<8
+#define NEXT_KEY_CLOSING_BRACKET 0x04
+#define NEXT_KEY_CARET_CIRCUMFLEX 0x4F|KD_LSHIFT<<8
+#define NEXT_KEY_UNDERSCORE 0x1D|KD_LSHIFT<<8
+#define NEXT_KEY_GRAVE_ACCENT 0x26
+#define NEXT_KEY_LOWERCASE_A 0x39
+#define NEXT_KEY_LOWERCASE_B 0x35
+#define NEXT_KEY_LOWERCASE_C 0x33
+#define NEXT_KEY_LOWERCASE_D 0x3B
+#define NEXT_KEY_LOWERCASE_E 0x44
+#define NEXT_KEY_LOWERCASE_F 0x3C
+#define NEXT_KEY_LOWERCASE_G 0x3D
+#define NEXT_KEY_LOWERCASE_H 0x40
+#define NEXT_KEY_LOWERCASE_I 0x06
+#define NEXT_KEY_LOWERCASE_J 0x3F
+#define NEXT_KEY_LOWERCASE_K 0x3E
+#define NEXT_KEY_LOWERCASE_L 0x2D
+#define NEXT_KEY_LOWERCASE_M 0x36
+#define NEXT_KEY_LOWERCASE_N 0x37
+#define NEXT_KEY_LOWERCASE_O 0x07
+#define NEXT_KEY_LOWERCASE_P 0x08
+#define NEXT_KEY_LOWERCASE_Q 0x42
+#define NEXT_KEY_LOWERCASE_R 0x45
+#define NEXT_KEY_LOWERCASE_S 0x3A
+#define NEXT_KEY_LOWERCASE_T 0x48
+#define NEXT_KEY_LOWERCASE_U 0x46
+#define NEXT_KEY_LOWERCASE_V 0x34
+#define NEXT_KEY_LOWERCASE_W 0x43
+#define NEXT_KEY_LOWERCASE_X 0x32
+#define NEXT_KEY_LOWERCASE_Y 0x47
+#define NEXT_KEY_LOWERCASE_Z 0x31
+#define NEXT_KEY_OPENING_BRACE 0x05|KD_LSHIFT<<8
+#define NEXT_KEY_VERTICAL_BAR 0x27|KD_LSHIFT<<8
+#define NEXT_KEY_CLOSING_BRACE 0x04|KD_LSHIFT<<8
+#define NEXT_KEY_TILDE 0x26|KD_LSHIFT<<8
+#define NEXT_KEY_DELETE 0x1B|KD_LSHIFT<<8 // FIXME: Made it up
+
+void ascii_init() {
+  ascii2next[8] = NEXT_KEY_BACKSPACE;
+  ascii2next[9] = NEXT_KEY_HORIZONTAL_TAB;
+  ascii2next[10] = NEXT_KEY_ENTER;
+  ascii2next[27] = NEXT_KEY_ESCAPE;
+  ascii2next[' '] = NEXT_KEY_SPACE;
+  ascii2next['!'] = NEXT_KEY_EXCLAMATION;
+  ascii2next['"'] = NEXT_KEY_DOUBLE_QUOTES;
+  ascii2next['#'] = NEXT_KEY_NUMBER_SIGN;
+  ascii2next['$'] = NEXT_KEY_DOLLAR;
+  ascii2next['%'] = NEXT_KEY_PERCENT;
+  ascii2next['&'] = NEXT_KEY_AMPERSAND;
+  ascii2next['\''] = NEXT_KEY_SINGLE_QUOTE;
+  ascii2next['('] = NEXT_KEY_LEFT_PARENTHESIS;
+  ascii2next[')'] = NEXT_KEY_RIGHT_PARENTHESIS;
+  ascii2next['*'] = NEXT_KEY_ASTERISK;
+  ascii2next['+'] = NEXT_KEY_PLUS;
+  ascii2next[','] = NEXT_KEY_COMMA;
+  ascii2next['-'] = NEXT_KEY_MINUS;
+  ascii2next['.'] = NEXT_KEY_PERIOD;
+  ascii2next['/'] = NEXT_KEY_SLASH;
+  ascii2next['0'] = NEXT_KEY_ZERO;
+  ascii2next['1'] = NEXT_KEY_ONE;
+  ascii2next['2'] = NEXT_KEY_TWO;
+  ascii2next['3'] = NEXT_KEY_THREE;
+  ascii2next['4'] = NEXT_KEY_FOUR;
+  ascii2next['5'] = NEXT_KEY_FIVE;
+  ascii2next['6'] = NEXT_KEY_SIX;
+  ascii2next['7'] = NEXT_KEY_SEVEN;
+  ascii2next['8'] = NEXT_KEY_EIGHT;
+  ascii2next['9'] = NEXT_KEY_NINE;
+  ascii2next[':'] = NEXT_KEY_COLON;
+  ascii2next[';'] = NEXT_KEY_SEMICOLON;
+  ascii2next['<'] = NEXT_KEY_LESS_THAN;
+  ascii2next['='] = NEXT_KEY_EQUALS;
+  ascii2next['>'] = NEXT_KEY_GREATER_THAN;
+  ascii2next['?'] = NEXT_KEY_QUESTION_MARK;
+  ascii2next['@'] = NEXT_KEY_AT_SIGN;
+  ascii2next['A'] = NEXT_KEY_UPPERCASE_A;
+  ascii2next['B'] = NEXT_KEY_UPPERCASE_B;
+  ascii2next['C'] = NEXT_KEY_UPPERCASE_C;
+  ascii2next['D'] = NEXT_KEY_UPPERCASE_D;
+  ascii2next['E'] = NEXT_KEY_UPPERCASE_E;
+  ascii2next['F'] = NEXT_KEY_UPPERCASE_F;
+  ascii2next['G'] = NEXT_KEY_UPPERCASE_G;
+  ascii2next['H'] = NEXT_KEY_UPPERCASE_H;
+  ascii2next['I'] = NEXT_KEY_UPPERCASE_I;
+  ascii2next['J'] = NEXT_KEY_UPPERCASE_J;
+  ascii2next['K'] = NEXT_KEY_UPPERCASE_K;
+  ascii2next['L'] = NEXT_KEY_UPPERCASE_L;
+  ascii2next['M'] = NEXT_KEY_UPPERCASE_M;
+  ascii2next['N'] = NEXT_KEY_UPPERCASE_N;
+  ascii2next['O'] = NEXT_KEY_UPPERCASE_O;
+  ascii2next['P'] = NEXT_KEY_UPPERCASE_P;
+  ascii2next['Q'] = NEXT_KEY_UPPERCASE_Q;
+  ascii2next['R'] = NEXT_KEY_UPPERCASE_R;
+  ascii2next['S'] = NEXT_KEY_UPPERCASE_S;
+  ascii2next['T'] = NEXT_KEY_UPPERCASE_T;
+  ascii2next['U'] = NEXT_KEY_UPPERCASE_U;
+  ascii2next['V'] = NEXT_KEY_UPPERCASE_V;
+  ascii2next['W'] = NEXT_KEY_UPPERCASE_W;
+  ascii2next['X'] = NEXT_KEY_UPPERCASE_X;
+  ascii2next['Y'] = NEXT_KEY_UPPERCASE_Y;
+  ascii2next['Z'] = NEXT_KEY_UPPERCASE_Z;
+  ascii2next['['] = NEXT_KEY_OPENING_BRACKET;
+  ascii2next['\\'] = NEXT_KEY_BACKSLASH;
+  ascii2next[']'] = NEXT_KEY_CLOSING_BRACKET;
+  ascii2next['^'] = NEXT_KEY_CARET_CIRCUMFLEX;
+  ascii2next['_'] = NEXT_KEY_UNDERSCORE;
+  ascii2next['`'] = NEXT_KEY_GRAVE_ACCENT;
+  ascii2next['a'] = NEXT_KEY_LOWERCASE_A;
+  ascii2next['b'] = NEXT_KEY_LOWERCASE_B;
+  ascii2next['c'] = NEXT_KEY_LOWERCASE_C;
+  ascii2next['d'] = NEXT_KEY_LOWERCASE_D;
+  ascii2next['e'] = NEXT_KEY_LOWERCASE_E;
+  ascii2next['f'] = NEXT_KEY_LOWERCASE_F;
+  ascii2next['g'] = NEXT_KEY_LOWERCASE_G;
+  ascii2next['h'] = NEXT_KEY_LOWERCASE_H;
+  ascii2next['i'] = NEXT_KEY_LOWERCASE_I;
+  ascii2next['j'] = NEXT_KEY_LOWERCASE_J;
+  ascii2next['k'] = NEXT_KEY_LOWERCASE_K;
+  ascii2next['l'] = NEXT_KEY_LOWERCASE_L;
+  ascii2next['m'] = NEXT_KEY_LOWERCASE_M;
+  ascii2next['n'] = NEXT_KEY_LOWERCASE_N;
+  ascii2next['o'] = NEXT_KEY_LOWERCASE_O;
+  ascii2next['p'] = NEXT_KEY_LOWERCASE_P;
+  ascii2next['q'] = NEXT_KEY_LOWERCASE_Q;
+  ascii2next['r'] = NEXT_KEY_LOWERCASE_R;
+  ascii2next['s'] = NEXT_KEY_LOWERCASE_S;
+  ascii2next['t'] = NEXT_KEY_LOWERCASE_T;
+  ascii2next['u'] = NEXT_KEY_LOWERCASE_U;
+  ascii2next['v'] = NEXT_KEY_LOWERCASE_V;
+  ascii2next['w'] = NEXT_KEY_LOWERCASE_W;
+  ascii2next['x'] = NEXT_KEY_LOWERCASE_X;
+  ascii2next['y'] = NEXT_KEY_LOWERCASE_Y;
+  ascii2next['z'] = NEXT_KEY_LOWERCASE_Z;
+  ascii2next['{'] = NEXT_KEY_OPENING_BRACE;
+  ascii2next['|'] = NEXT_KEY_VERTICAL_BAR;
+  ascii2next['}'] = NEXT_KEY_CLOSING_BRACE;
+  ascii2next['~'] = NEXT_KEY_TILDE;
+  ascii2next[0x7F] = NEXT_KEY_DELETE;
+}
 
 #define USB_MOUSE_4BYTES_NAME "USB Mouse (4 Bytes)"
 static void handle_mouse_data_4bytes(uint8_t* data) {
   usb_mouse_data_4bytes_t *mouse_data = (usb_mouse_data_4bytes_t *)data;
 
-  queue_mouse(mouse_data->x, mouse_data->y, mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK, mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK);
+  queue_mouse_from_interrupt(
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK,
+    mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK
+  );
 
-  if (mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK)
-    Serial.printf("\n%s: left button\n", USB_MOUSE_4BYTES_NAME);
-  if (mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK)
-    Serial.printf("\n%s: right button\n", USB_MOUSE_4BYTES_NAME);
-  if (mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK)
-    Serial.printf("\n%s: middle button\n", USB_MOUSE_4BYTES_NAME);
-
-  if (mouse_data->x > 0)
-    Serial.printf("\n%s: right %d\n", USB_MOUSE_4BYTES_NAME, mouse_data->x);
-  if (mouse_data->x < 0)
-    Serial.printf("\n%s: left %d\n", USB_MOUSE_4BYTES_NAME, mouse_data->x);
-
-  if (mouse_data->y > 0)
-    Serial.printf("\n%s: down %d\n", USB_MOUSE_4BYTES_NAME, mouse_data->y);
-  if (mouse_data->y < 0)
-    Serial.printf("\n%s: up %d\n", USB_MOUSE_4BYTES_NAME, mouse_data->y);
-
-  if (mouse_data->scroll > 0)
-    Serial.printf("\n%s: scroll up\n", USB_MOUSE_4BYTES_NAME);
-  if (mouse_data->scroll < 0)
-    Serial.printf("\n%s: scroll down\n", USB_MOUSE_4BYTES_NAME);
+  // Serial.printf("\n%s: L=%d R=%d M=%d X=%d Y=%d S=%s\n",
+  //   USB_MOUSE_4BYTES_NAME,
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK),
+  //   mouse_data->x,
+  //   mouse_data->y,
+  //   mouse_data->scroll == USB_MOUSE_SCROLL_UP ? "UP" : (mouse_data->scroll == USB_MOUSE_SCROLL_DOWN ? "DOWN" : "_")
+  // );
 }
 
 #define USB_MOUSE_6BYTES_NAME "USB Mouse (6 Bytes)"
 static void handle_mouse_data_6bytes(uint8_t* data) {
   usb_mouse_data_6bytes_t *mouse_data = (usb_mouse_data_6bytes_t *)data;
 
-  queue_mouse(mouse_data->x, mouse_data->y, mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK, mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK);
+  mouse_data->y /= 16; // Something wrong with the value reported by the mouse
 
-  if (mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK)
-    Serial.printf("\n%s: left button\n", USB_MOUSE_6BYTES_NAME);
-  if (mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK)
-    Serial.printf("\n%s: right button\n", USB_MOUSE_6BYTES_NAME);
-  if (mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK)
-    Serial.printf("\n%s:middle button\n", USB_MOUSE_6BYTES_NAME);
+  queue_mouse_from_interrupt(
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK,
+    mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK
+  );
 
-  if (mouse_data->x > 0)
-    Serial.printf("\n%s: right %d\n", USB_MOUSE_6BYTES_NAME, mouse_data->x);
-  if (mouse_data->x < 0)
-    Serial.printf("\n%s: left %d\n", USB_MOUSE_6BYTES_NAME, mouse_data->x);
-
-  // FIXME: up and down data is a bit screwed up. Maybe crazy mouse.
-  if (mouse_data->y > 0)
-    Serial.printf("\n%s: down %d\n", USB_MOUSE_6BYTES_NAME, mouse_data->y);
-  if (mouse_data->y < 0)
-    Serial.printf("\n%s: up %d\n", USB_MOUSE_6BYTES_NAME, mouse_data->y);
-
-  if (mouse_data->scroll > 0)
-    Serial.printf("\n%s: scroll up\n", USB_MOUSE_6BYTES_NAME);
-  if (mouse_data->scroll < 0)
-    Serial.printf("\n%s: scroll down\n", USB_MOUSE_6BYTES_NAME);
+  // Serial.printf("\n%s: L=%d R=%d M=%d X=%d Y=%d S=%s\n",
+  //   USB_MOUSE_6BYTES_NAME,
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK),
+  //   mouse_data->x,
+  //   mouse_data->y,
+  //   mouse_data->scroll == USB_MOUSE_SCROLL_UP ? "UP" : (mouse_data->scroll == USB_MOUSE_SCROLL_DOWN ? "DOWN" : "_")
+  // );
 }
 
 // FIXME: Instead of this hack, we should get the mouse report descriptor, and parse it to know where the data really is
@@ -488,9 +680,68 @@ void usb_mouse_init() {
   USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
 }
 
+char c = 0;
+char modifiers = 0;
+bool pressed = false;
+
+int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn this into a real queue
+  int tries = 10;
+  while (tries && keyboard_data_ready) {
+    printf("\nWARNING: queue_keyboard retrying...\n");
+    delayMicroseconds(NEXT_KEYBOARD_TIMING_100NS/10);
+    tries--;
+  }
+
+  if (tries) {
+    keyboard_data = NEXT_KEYBOARD_DATA_PACKET |
+      ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT | // byte1
+      ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT); // byte2
+    keyboard_data_ready = true;
+    return true;
+  } else {
+    Serial.printf("\nERROR: queue_keyboard failed to send mouse event!\n");
+    return false;
+  }
+}
+
+int queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2) {
+  int tries = 10;
+  while (tries && mouse_data_ready) { // TODO: we really need to turn this into a real queue or update data. We can't have a while loop and a delay during an interrupt
+    delayMicroseconds(NEXT_KEYBOARD_TIMING_100NS/10);
+    tries--;
+  }
+
+  if (tries) {
+    uint8_t dx = ((mousex&0x80)>>1) | (mousex&0x3F); // sign+6bits
+    uint8_t dy = ((mousey&0x80)>>1) | (mousey&0x3F); // sign+6bits
+
+    mouse_data = NEXT_KEYBOARD_DATA_PACKET |
+      (!button1 << NEXT_KEYBOARD_MOUSE_BUTTON1_BIT) | (((~dx)&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MOUSE_X_START_BIT) | // byte1
+      (!button2 << NEXT_KEYBOARD_MOUSE_BUTTON2_BIT) | (((~dy)&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MOUSE_Y_START_BIT); // byte2
+
+    mouse_data_ready = true;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+void next_keyboard_mouse_print_changes() {
+  if (mouse_data_ready) {
+    bool button1 = !(mouse_data&(1<<NEXT_KEYBOARD_MOUSE_BUTTON1_BIT));
+    bool button2 = !(mouse_data&(1<<NEXT_KEYBOARD_MOUSE_BUTTON2_BIT));
+    uint8_t tmpx = ~((mouse_data>>NEXT_KEYBOARD_MOUSE_X_START_BIT)&NEXT_KEYBOARD_BYTE_MASK);
+    uint8_t tmpy = ~((mouse_data>>NEXT_KEYBOARD_MOUSE_Y_START_BIT)&NEXT_KEYBOARD_BYTE_MASK);
+    int8_t dx = (tmpx&0x70)<<1|(tmpx&0x3F);
+    int8_t dy = (tmpy&0x70)<<1|(tmpy&0x3F);;
+    Serial.printf("\nmouse_data: L=%d R=%d dx=%d dy=%d mouse_data=0x%x \n", button1, button2, dx, dy, mouse_data);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.printf("Starting NeXT Keyboard\n");
+  ascii_init();
 
   // USB Mouse. USB Soft Host needs to be initialized before next_keyboard_timer and next_mouse_timer below or USB won't work.
   usb_mouse_init();
@@ -500,66 +751,41 @@ void setup() {
   next_mouse_init(&next_mouse_timer);
 }
 
-char c = 0;
-char modifiers = 0;
-bool pressed = false;
-
-int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn this into a real queue
-  if (!keyboard_data_ready) {
-    keyboard_data = NEXT_KEYBOARD_DATA_PACKET |
-      ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT | // byte1
-      ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT); // byte2
-    keyboard_data_ready = true;
-    return true;
-  } else {
-    return false;
-  }
-}
-
-int queue_mouse(int8_t mousex, int8_t mousey, bool button1, bool button2) { // TODO: turn this into a real queue or update data
-  if (!mouse_data_ready) {
-    uint8_t dx = (mousex&(1<<7))>>1 | mousex&0x3F; // sign+6bits
-    uint8_t dy = (mousey&(1<<7))>>1 | mousey&0x3F; // sign+6bits
-
-    mouse_data = NEXT_KEYBOARD_DATA_PACKET |
-      (!button1 << NEXT_KEYBOARD_MOUSE_BUTTON1_BIT) | (((!dx)&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MOUSE_X_START_BIT) |
-      (!button2 << NEXT_KEYBOARD_MOUSE_BUTTON2_BIT) | (((!dy)&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MOUSE_Y_START_BIT);
-
-    mouse_data_ready = true;
-    return true;
-  } else {
-    return false;
-  }
-}
-
 void loop() {
-  if (next_mouse_changed)
-    next_mouse_print_changes();
+  // next_mouse_print_changes();
+  next_keyboard_mouse_print_changes();
 
   if (c == 0 && Serial.available()) {
     char tmpc = Serial.read();
+    Serial.printf("\n%c 0x%x\n", tmpc, tmpc);
     //    if (tmpc != 0x0A) {
     c = tmpc;
     pressed = true;
     //    }
 
-    if (c == 'Q') {
-      c = KEY_APOSTROPHE;
+    if (c == '%') {
+      c = NEXT_KEY_GRAVE_ACCENT;
       modifiers = KD_RCOMM;
-    } else if (c == 0x0A) {
-      c = 0x2A;  // ENTER/RETURN
+    } else if (c == '^') {
+      c = NEXT_KEY_LOWERCASE_C;
+      modifiers = KD_CNTL;
+    } else if (c == '\'') {
+      c = NEXT_KEY_HORIZONTAL_TAB;
     } else {
-      c = c - ('a' - NEXT_KEY_A);
+      modifiers = (ascii2next[c]&0xff00)>>8;
+      c = ascii2next[c];
     }
   }
 
-  if (c != 0 && queue_keyboard(c, pressed, modifiers)) {
-    Serial.printf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", (c&NEXT_KEYBOARD_BYTE_MASK), c, pressed, modifiers);
-    if (pressed) {
-      pressed = false;
-    } else {
-      c = 0;
-      modifiers = 0;
+  if (c != 0) {
+    if (queue_keyboard(c, pressed, modifiers)) {
+      Serial.printf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", (c&NEXT_KEYBOARD_BYTE_MASK), c, pressed, modifiers);
+      if (pressed) {
+        pressed = false;
+      } else {
+        c = 0;
+        modifiers = 0;
+      }
     }
   }
 
