@@ -135,7 +135,7 @@ module Keyboard(
 				can_recv_start <= 0;
 				recv_count <= 0; // TODO: why need this?
 				casex (tmp)
-					21'b10000000001100000000?: begin // ready response
+					21'b10000000001100000000?: begin // ready response. not including stop bit.
 						kb_state <= READY_READY;
 						data_receved <= 1;
 					end

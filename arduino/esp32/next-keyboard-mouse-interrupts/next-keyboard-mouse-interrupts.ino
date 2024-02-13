@@ -190,8 +190,9 @@ void next_mouse_init(hw_timer_t **next_mouse_timer) {
 #define NEXT_KEYBOARD_LED_LEFT_MASK 0x2000
 #define NEXT_KEYBOARD_LED_RIGHT_MASK 0x4000
 
+// packets to send. includes start (low/0) and stop (high/1) bits
 #define NEXT_KEYBOARD_DATA_PACKET     0b1000000000010000000000
-#define NEXT_KEYBOARD_COMMAND_PACKET  0b1100000000011000000000 // FIXME: check!
+#define NEXT_KEYBOARD_COMMAND_PACKET  0b1100000000011000000000
 #define NEXT_KEYBOARD_IDLE_PACKET     NEXT_KEYBOARD_COMMAND_PACKET
 #define NEXT_KEYBOARD_BYTE_MASK       0x7F // 7bits not really a byte :)
 #define NEXT_KEYBOARD_KEY_START_BIT     1
