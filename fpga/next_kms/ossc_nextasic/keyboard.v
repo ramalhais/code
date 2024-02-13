@@ -62,6 +62,7 @@ module Keyboard(
 			key_clk_count <= 0;
 			// keyboard clk tick, 53us
 			if (send_count == 6'd40) begin
+				// sent packets are defined here as LSB (left) to MSB (right), not including start nor stop (high/1) bit.
 				if (kb_state == READY_NOT) begin
 					tmp <= 21'b111101111110000000000;
 					is_send_short <= 0;
@@ -135,6 +136,7 @@ module Keyboard(
 				can_recv_start <= 0;
 				recv_count <= 0; // TODO: why need this?
 				casex (tmp)
+					// received packets are defined here as MSB (left) to as LSB (right) although it's sent LSB first.
 					21'b10000000001100000000?: begin // ready response. not including stop bit.
 						kb_state <= READY_READY;
 						data_receved <= 1;
