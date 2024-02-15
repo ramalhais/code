@@ -369,12 +369,6 @@ typedef struct {
   int8_t scroll; // 1==up 0xff==down
 } usb_mouse_data_4bytes_t; // Microsoft Wheel Mouse Optical 1.1A USB and PS/2 Compatible
 
-// NeXT keycodes:
-// https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
-// https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
-
-#include "next-keycodes.h"
-
 #define USB_MOUSE_4BYTES_NAME "USB Mouse (4 Bytes)"
 static void handle_mouse_data_4bytes(uint8_t* data) {
   usb_mouse_data_4bytes_t *mouse_data = (usb_mouse_data_4bytes_t *)data;
