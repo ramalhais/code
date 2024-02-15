@@ -19,13 +19,13 @@
 #define PIN_POWER_ON 23
 
 void poweron_init() {
-  pinMode(PIN_POWER_ON, INPUT_PULLDOWN);
+  pinMode(PIN_POWER_ON, OUTPUT);
   digitalWrite(PIN_POWER_ON, LOW);
 }
 
 void poweron_toggle() {
   digitalWrite(PIN_POWER_ON, HIGH);
-  delayMicroseconds(1000);
+  delayMicroseconds(500); // 400microseconds seems to be the minimum for power on "key" to be detected
   digitalWrite(PIN_POWER_ON, LOW);
 }
 
@@ -268,7 +268,7 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_read_interrupt() {
 
   if (state == STATE_WAITING) {
     all_high_counter = (all_high_counter * val) + val;
-    if (all_high_counter == 6) {  // sense 8 continuous bits high
+    if (all_high_counter == 5) {  // sense 8 continuous bits high. works with some resets. also works from 1 to 8. 5 seems to work best
       all_high_counter = 0;
       bits = 0;
       data = 0;
@@ -494,7 +494,7 @@ int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn
     keyboard_data_ready = true;
     return true;
   } else {
-    Serial.printf("\nERROR: queue_keyboard failed to send mouse event!\n");
+    Serial.printf("\nERROR: queue_keyboard failed to send event!\n");
     return false;
   }
 }
@@ -649,4 +649,5 @@ void loop() {
     }
     read_data_ready = false;
   }
+  delay(10); // Somehow queue_keyboard can't be fast enough? weird
 }
