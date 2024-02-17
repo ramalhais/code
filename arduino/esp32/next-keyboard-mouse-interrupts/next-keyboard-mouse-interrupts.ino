@@ -14,10 +14,15 @@
 #define Dprintf (void)
 #endif
 
-
-
 #if defined(ARDUINO_ESP32S3_DEV)
-  // Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial RX/TX: 43,44
+  // ESP32S3_DEV only
+  #include <Adafruit_NeoPixel.h>
+  #include <EspUsbHostKeybord.h>
+  #define RGB_PIN 48
+  #define RGB_ENABLED 1
+  #define USB_HOST_ENABLED 1
+
+  // Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial UART: 43,44
   // This NeXT Keyboard Pins
   #define PIN_TO_KBD 4    // Input to this keyboard
   #define PIN_FROM_KBD 5  // Output from this keyboard
@@ -68,11 +73,43 @@
   #define NEXT_MOUSE_RIGHT_PIN 26 // mouse pin 6
   #define NEXT_MOUSE_LEFT_PIN 27 // mouse pin 7
 #else
-  #error Arduino board not supported
+  #error Arduino board not supported. Please add your pin mappings
+#endif
+
+#ifdef RGB_ENABLED
+#define N_PIXELS 1
+#define PIXEL_FORMAT NEO_GRB+NEO_KHZ800
+Adafruit_NeoPixel pixels(N_PIXELS, RGB_PIN, PIXEL_FORMAT);
+uint8_t r=16, g=0, b=0;
+
+void neopixel_init() {
+  pixels.begin();
+  pixels.clear();
+  pixels.setPixelColor(0, pixels.Color(r, g, b));
+  pixels.show();
+}
+
+void neopixel_set(uint8_t r, uint8_t g, uint8_t b) {
+  pixels.clear();
+  pixels.setPixelColor(0, pixels.Color(r, g, b));
+  pixels.show();
+}
+#endif
+
+#ifdef USB_HOST_ENABLED
+class MyEspUsbHostKeybord : public EspUsbHostKeybord {
+public:
+  void onKey(usb_transfer_t *transfer) {
+    uint8_t *const p = transfer->data_buffer;
+    Serial.printf("onKey %02x %02x %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
+  };
+};
+
+MyEspUsbHostKeybord usbHost;
 #endif
 
 #define POWER_ON_ACTIVE LOW
-#define POWER_ON_TIME_US 500 / microseconds
+#define POWER_ON_TIME_US 500 // microseconds
 
 void poweron_init() {
   pinMode(PIN_POWER_ON, OUTPUT);
@@ -582,26 +619,51 @@ void next_keyboard_mouse_print_changes() {
 }
 
 void setup() {
+#ifdef RGB_ENABLED
+  neopixel_init();
+#endif
+
   Serial.begin(115200);
   Serial.printf("Starting NeXT Keyboard\n");
-  poweron_init();
-  ascii_init();
 
+  // Setup POWER_ON pin
+  poweron_init();
+  // Setup ASCII to NeXT keycode table
+  ascii_init();
+#ifdef USB_HOST_ENABLED
+  // Hardware USB Host
+  usbHost.begin();
+#endif
   // USB Mouse. USB Soft Host needs to be initialized before next_keyboard_timer and next_mouse_timer below or USB won't work.
   usb_mouse_init();
   // This emulated NeXT Keyboard
   next_keyboard_init(&next_keyboard_timer);
   // Real NeXT Mouse
   next_mouse_init(&next_mouse_timer);
+
+#ifdef RGB_ENABLED
+  r=0; g=16; b=0;
+  neopixel_set(r,g,b);
+#endif
 }
 
 void loop() {
+#ifdef USB_HOST_ENABLED
+  // Hardware USB Host update
+  usbHost.task();
+#endif
+
   static bool enable_key_enter = false;
 
   // next_mouse_print_changes();
   next_keyboard_mouse_print_changes();
 
   if (c == 0 && Serial.available()) {
+#ifdef RGB_ENABLED
+  r=0; g=0; b=16;
+  neopixel_set(r,g,b);
+#endif
+
     char tmpc = Serial.read();
     Dprintf("\n%c 0x%x\n", tmpc, tmpc);
     //    if (tmpc != 0x0A) {
@@ -645,6 +707,10 @@ void loop() {
 
   if (c != 0) {
     if (queue_keyboard(c, pressed, modifiers)) {
+#ifdef RGB_ENABLED
+      r=16; g=16; b=16;
+      neopixel_set(r,g,b);
+#endif
       Dprintf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", (c&NEXT_KEYBOARD_BYTE_MASK), c, pressed, modifiers);
       if (pressed) {
         pressed = false;
@@ -687,4 +753,8 @@ void loop() {
     read_data_ready = false;
   }
   delay(10); // Somehow queue_keyboard can't be fast enough? weird
+#ifdef RGB_ENABLED
+  r=0; g=16; b=0;
+  neopixel_set(r,g,b);
+#endif
 }
