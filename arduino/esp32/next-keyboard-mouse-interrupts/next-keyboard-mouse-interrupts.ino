@@ -14,41 +14,78 @@
 #define Dprintf (void)
 #endif
 
-#define PIN_TO_KBD 32    // Input to this keyboard
-#define PIN_FROM_KBD 33  // Output from this keyboard
-#define PIN_POWER_ON 23
+
+
+#if defined(ARDUINO_ESP32S3_DEV)
+  // Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial RX/TX: 43,44
+  // This NeXT Keyboard Pins
+  #define PIN_TO_KBD 4    // Input to this keyboard
+  #define PIN_FROM_KBD 5  // Output from this keyboard
+  #define PIN_POWER_ON 6
+
+  // USB Soft Host Pins. Must be between pins 8-31.
+  #define DP_P0  11  // D+ (DM2) somehow these seem to be switched up
+  #define DM_P0  12  // D- (DP1)
+  #define DP_P1  -1 // 22. -1 to disable
+  #define DM_P1  -1 // 23. -1 to disable
+  #define DP_P2  -1 // 18. -1 to disable
+  #define DM_P2  -1 // 19. -1 to disable
+  #define DP_P3  -1 // 13. -1 to disable
+  #define DM_P3  -1 // 15. -1 to disable
+
+  // NeXT Mouse mini-DIN 8pin: https://deskthority.net/wiki/Bus_mouse#NeXT_.28non-ADB.29
+  // 8pin mini-DIN. mouse pin1 = 5V. mouse pin8 = GND
+  #define NEXT_MOUSE_XA_PIN 7 // mouse pin 2
+  #define NEXT_MOUSE_XB_PIN 15 // mouse pin 3
+  #define NEXT_MOUSE_YA_PIN 16 // mouse pin 4
+  #define NEXT_MOUSE_YB_PIN 17 // mouse pin 5
+  #define NEXT_MOUSE_RIGHT_PIN 18 // mouse pin 6
+  #define NEXT_MOUSE_LEFT_PIN 8 // mouse pin 7
+
+#elif defined(ARDUINO_ESP32_DEV)
+
+  // This NeXT Keyboard Pins
+  #define PIN_TO_KBD 32    // Input to this keyboard
+  #define PIN_FROM_KBD 33  // Output from this keyboard
+  #define PIN_POWER_ON 23
+
+  // USB Soft Host Pins
+  #define DP_P0  16  // D+
+  #define DM_P0  17  // D-
+  #define DP_P1  -1 // 22. -1 to disable
+  #define DM_P1  -1 // 23. -1 to disable
+  #define DP_P2  -1 // 18. -1 to disable
+  #define DM_P2  -1 // 19. -1 to disable
+  #define DP_P3  -1 // 13. -1 to disable
+  #define DM_P3  -1 // 15. -1 to disable
+
+  // NeXT Mouse mini-DIN 8pin: https://deskthority.net/wiki/Bus_mouse#NeXT_.28non-ADB.29
+  // 8pin mini-DIN. mouse pin1 = 5V. mouse pin8 = GND
+  #define NEXT_MOUSE_XA_PIN 18 // mouse pin 2
+  #define NEXT_MOUSE_XB_PIN 19 // mouse pin 3
+  #define NEXT_MOUSE_YA_PIN 21 // mouse pin 4
+  #define NEXT_MOUSE_YB_PIN 25 // mouse pin 5
+  #define NEXT_MOUSE_RIGHT_PIN 26 // mouse pin 6
+  #define NEXT_MOUSE_LEFT_PIN 27 // mouse pin 7
+#else
+  #error Arduino board not supported
+#endif
+
+#define POWER_ON_ACTIVE LOW
+#define POWER_ON_TIME_US 500 / microseconds
 
 void poweron_init() {
   pinMode(PIN_POWER_ON, OUTPUT);
-  digitalWrite(PIN_POWER_ON, LOW);
+  digitalWrite(PIN_POWER_ON, !POWER_ON_ACTIVE);
 }
 
 void poweron_toggle() {
-  digitalWrite(PIN_POWER_ON, HIGH);
-  delayMicroseconds(500); // 400microseconds seems to be the minimum for power on "key" to be detected
-  digitalWrite(PIN_POWER_ON, LOW);
+  digitalWrite(PIN_POWER_ON, POWER_ON_ACTIVE);
+  delayMicroseconds(POWER_ON_TIME_US); // 400microseconds seems to be the minimum for power on "key" to be detected
+  digitalWrite(PIN_POWER_ON, !POWER_ON_ACTIVE);
 }
 
-// USB Soft Host Pins
-#define DP_P0  16  // D+
-#define DM_P0  17  // D-
-#define DP_P1  -1 // 22. -1 to disable
-#define DM_P1  -1 // 23. -1 to disable
-#define DP_P2  -1 // 18. -1 to disable
-#define DM_P2  -1 // 19. -1 to disable
-#define DP_P3  -1 // 13. -1 to disable
-#define DM_P3  -1 // 15. -1 to disable
-
-// NeXT Mouse mini-DIN 8pin: https://deskthority.net/wiki/Bus_mouse#NeXT_.28non-ADB.29
-// 8pin mini-DIN. mouse pin1 = 5V. mouse pin8 = GND
 // PS2 to NeXT Mouse Arduino code: http://www.asterontech.com/Asterontech/next_ps2_mouse.html
-#define NEXT_MOUSE_XA_PIN 18 // mouse pin 2
-#define NEXT_MOUSE_XB_PIN 19 // mouse pin 3
-#define NEXT_MOUSE_YA_PIN 21 // mouse pin 4
-#define NEXT_MOUSE_YB_PIN 25 // mouse pin 5
-#define NEXT_MOUSE_RIGHT_PIN 26 // mouse pin 6
-#define NEXT_MOUSE_LEFT_PIN 27 // mouse pin 7
-
 typedef struct {
   unsigned int xa : 1;
   unsigned int xb : 1;
