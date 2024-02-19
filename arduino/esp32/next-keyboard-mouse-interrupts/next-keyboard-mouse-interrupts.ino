@@ -4,7 +4,7 @@
 #include <ADebouncer.h>
 #include "next-keycodes.h"
 
-#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_DEBUG
+#if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO//ARDUHAL_LOG_LEVEL_DEBUG
   #define DEBUG_ALL
 #endif
 
@@ -22,7 +22,8 @@
   #define RGB_ENABLED 1
   #define USB_HOST_ENABLED 1
 
-  // Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial UART: 43,44
+  // ESP32S3_DEV: Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial UART: 43,44
+
   // This NeXT Keyboard Pins
   #define PIN_TO_KBD 4    // Input to this keyboard
   #define PIN_FROM_KBD 5  // Output from this keyboard
@@ -80,12 +81,11 @@
 #define N_PIXELS 1
 #define PIXEL_FORMAT NEO_GRB+NEO_KHZ800
 Adafruit_NeoPixel pixels(N_PIXELS, RGB_PIN, PIXEL_FORMAT);
-uint8_t r=16, g=0, b=0;
 
 void neopixel_init() {
   pixels.begin();
   pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(r, g, b));
+  pixels.setPixelColor(0, pixels.Color(16, 0, 0)); //RED
   pixels.show();
 }
 
@@ -94,18 +94,6 @@ void neopixel_set(uint8_t r, uint8_t g, uint8_t b) {
   pixels.setPixelColor(0, pixels.Color(r, g, b));
   pixels.show();
 }
-#endif
-
-#ifdef USB_HOST_ENABLED
-class MyEspUsbHostKeybord : public EspUsbHostKeybord {
-public:
-  void onKey(usb_transfer_t *transfer) {
-    uint8_t *const p = transfer->data_buffer;
-    Serial.printf("onKey %02x %02x %02x %02x %02x %02x %02x %02x\n", p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
-  };
-};
-
-MyEspUsbHostKeybord usbHost;
 #endif
 
 #define POWER_ON_ACTIVE LOW
@@ -191,6 +179,8 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_mouse_read_interrupt() {
 // };
 
 #define QUADRATIC_DECODER_BITS 0b0100000110000010;
+
+int queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2);
 
 inline void next_mouse_handle_changes() {
   int dx = 0, dy = 0;
@@ -409,6 +399,99 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_write_interrupt() {
   }
 }
 
+void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
+  static uint8_t pressed_keys[6] = {0,0,0,0,0,0};
+
+  // Send key release event and remove key for keys no longer pressed
+  for(int p=0; p<6; p++) {
+    if (pressed_keys[p]) {
+      bool found = false;
+
+      for(int k=0; k<6; k++) {
+        if (keycode[k] == 0)
+          break;
+
+        if (pressed_keys[p] == keycode[k]) {
+          found = true;
+          break;
+        }
+      }
+
+#define HID_RCOMM 0
+      if (!found) {
+        queue_keyboard(hid2next[pressed_keys[p]], false, hid2next_modifiers(modifier, HID_RCOMM));
+        pressed_keys[p] = 0;
+      }
+    }
+  }
+
+  // Add new pressed keys and send key pressed event
+  if (keycode[0] == 0) { // FIXME: attempt to send only modifiers when no keys pressed
+    queue_keyboard(0, false, hid2next_modifiers(modifier, HID_RCOMM));    
+    return;
+  }
+
+  int free = -1;
+  bool found = false;
+  for(int k=0; k<6; k++) {
+    if (keycode[k] == 0)
+      break;
+
+    if ((hid2next[keycode[k]] == NEXT_KEY_GRAVE_ACCENT) && ((hid2next_modifiers(modifier, HID_RCOMM)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT))) {
+          poweron_toggle();
+          continue;
+    }
+
+    for(int p=0; p<6; p++) {
+      if (keycode[k] == pressed_keys[p]) {
+        found = true;
+        break;
+      } else if (free == -1 && pressed_keys[p] == 0) {
+        free = p;
+      }
+    }
+
+    if (!found) {
+      pressed_keys[free] = keycode[k];
+      queue_keyboard(hid2next[keycode[k]], true, hid2next_modifiers(modifier, HID_RCOMM));
+    }
+  }
+}
+
+// USB Host HID Keyboard stuff
+#ifdef USB_HOST_ENABLED
+class MyEspUsbHostKeybord : public EspUsbHostKeybord {
+public:
+  void onKey(usb_transfer_t *transfer) {
+
+    hid_keyboard_report_t *report = (hid_keyboard_report_t *)(transfer->data_buffer);
+
+    // Serial.printf("onKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
+    // Serial.printf("hid_modifiers=0x%x next_modifiers=0x%x\n", report->modifier, hid2next_modifiers(report->modifier, 0));
+    usb_update_keys(report->keycode, report->modifier);
+//     for(int i=0; i<6; i++) {
+//       if (report->keycode[i] && report->keycode[i] != 1) {
+//         Serial.printf("p[%d]=0x%x\n", i, report->keycode[i]);
+//         if ((hid2next[report->keycode[i]] == NEXT_KEY_GRAVE_ACCENT) && ((hid2next_modifiers(report->modifier,0)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT))) {
+//           poweron_toggle();
+//         } else if (queue_keyboard(hid2next[report->keycode[i]], true, hid2next_modifiers(report->modifier,0))) {
+// #ifdef RGB_ENABLED
+//           neopixel_set(0,16,16); // WHITE
+// #endif
+//           Dprintf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", (hid2next[report->keycode[i]]&NEXT_KEYBOARD_BYTE_MASK), hid2next[report->keycode[i]], true, hid2next_modifiers(report->modifier,0));
+//         }
+//       }
+//     }
+//     // if (!(report->keycode[0] || report->keycode[1] || report->keycode[2] || report->keycode[3] || report->keycode[4] || report->keycode[5])) {
+//     //   queue_keyboard(0, false, hid2next_modifiers(report->modifier,0));
+//     //   Dprintf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", 0, 0, false, hid2next_modifiers(report->modifier,0));
+//     // }
+  };
+};
+
+MyEspUsbHostKeybord usbHost;
+#endif
+
 // USB Soft Host stuff
 #define HID_INTERFACE_PROTO_KEYBOARD 1
 #define HID_INTERFACE_PROTO_MOUSE 2
@@ -566,6 +649,10 @@ int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn
       ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT | // byte1
       ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT); // byte2
     keyboard_data_ready = true;
+    Serial.printf("keyboard_data1=0x%x keyboard_data2=0x%x\n",
+      ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT,
+      ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT)
+    );
     return true;
   } else {
     Serial.printf("\nERROR: queue_keyboard failed to send event!\n");
@@ -628,8 +715,8 @@ void setup() {
 
   // Setup POWER_ON pin
   poweron_init();
-  // Setup ASCII to NeXT keycode table
-  ascii_init();
+  // Setup ASCII to NeXT and HID to NeXT keycode tables
+  next_keycodes_init();
 #ifdef USB_HOST_ENABLED
   // Hardware USB Host
   usbHost.begin();
@@ -642,8 +729,7 @@ void setup() {
   next_mouse_init(&next_mouse_timer);
 
 #ifdef RGB_ENABLED
-  r=0; g=16; b=0;
-  neopixel_set(r,g,b);
+  neopixel_set(0, 16, 0); // GREEN
 #endif
 }
 
@@ -660,8 +746,7 @@ void loop() {
 
   if (c == 0 && Serial.available()) {
 #ifdef RGB_ENABLED
-  r=0; g=0; b=16;
-  neopixel_set(r,g,b);
+  neopixel_set(0, 0, 16); // BLUE
 #endif
 
     char tmpc = Serial.read();
@@ -708,8 +793,7 @@ void loop() {
   if (c != 0) {
     if (queue_keyboard(c, pressed, modifiers)) {
 #ifdef RGB_ENABLED
-      r=16; g=16; b=16;
-      neopixel_set(r,g,b);
+      neopixel_set(16,16,16); // WHITE
 #endif
       Dprintf("\nQueued 0x%x (0x%x). pressed=%d modifiers=0x%x\n", (c&NEXT_KEYBOARD_BYTE_MASK), c, pressed, modifiers);
       if (pressed) {
@@ -752,9 +836,8 @@ void loop() {
     }
     read_data_ready = false;
   }
-  delay(10); // Somehow queue_keyboard can't be fast enough? weird
+  // delay(10); // Somehow queue_keyboard can't be fast enough? weird
 #ifdef RGB_ENABLED
-  r=0; g=16; b=0;
-  neopixel_set(r,g,b);
+  neopixel_set(0, 16, 0); // GREEN
 #endif
 }

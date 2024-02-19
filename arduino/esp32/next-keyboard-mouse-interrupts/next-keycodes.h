@@ -2,10 +2,13 @@
 // https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
 // https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
 
+#include <class/hid/hid.h>
+
 #ifndef _NEXT_KEYCODES_H_
 #define _NEXT_KEYCODES_H_
 
 uint16_t ascii2next[256];
+uint16_t hid2next[256];
 
 // Modifiers
 #define KD_CNTL 0x01
@@ -15,6 +18,28 @@ uint16_t ascii2next[256];
 #define KD_RCOMM 0x10
 #define KD_LALT 0x20
 #define KD_RALT 0x40
+
+uint8_t hid2next_modifiers(uint8_t hid_modifiers, uint8_t hid_rcomm) {
+  uint8_t next_modifiers = 0;
+  uint8_t rcomm = KEYBOARD_MODIFIER_RIGHTGUI;
+  uint8_t cntl = KEYBOARD_MODIFIER_LEFTCTRL;
+  if (hid_rcomm) {
+    rcomm = hid_rcomm;
+    if (rcomm != KEYBOARD_MODIFIER_RIGHTCTRL) {
+      cntl |= KEYBOARD_MODIFIER_RIGHTCTRL;
+    }
+  }
+  next_modifiers =
+    (bool)(hid_modifiers&cntl)        |
+    (bool)(hid_modifiers&KEYBOARD_MODIFIER_LEFTSHIFT)   <<1 |
+    (bool)(hid_modifiers&KEYBOARD_MODIFIER_RIGHTSHIFT)  <<2 |
+    (bool)(hid_modifiers&KEYBOARD_MODIFIER_LEFTGUI)     <<3 |
+    (bool)(hid_modifiers&rcomm)                         <<4 |
+    (bool)(hid_modifiers&KEYBOARD_MODIFIER_LEFTALT)     <<5 |
+    (bool)(hid_modifiers&KEYBOARD_MODIFIER_RIGHTALT)    <<6 ;
+
+  return next_modifiers;
+}
 
 // Keys
 #define NEXT_KEY_NO_KEY 0
@@ -29,7 +54,7 @@ uint16_t ascii2next[256];
 #define NEXT_KEY_DOLLAR 0x4D|KD_LSHIFT<<8
 #define NEXT_KEY_PERCENT 0x50|KD_LSHIFT<<8
 #define NEXT_KEY_AMPERSAND 0x4E|KD_LSHIFT<<8
-#define NEXT_KEY_SINGLE_QUOTE 0x2B|KD_LSHIFT<<8
+#define NEXT_KEY_SINGLE_QUOTE 0x2B
 #define NEXT_KEY_LEFT_PARENTHESIS 0x1F|KD_LSHIFT<<8
 #define NEXT_KEY_RIGHT_PARENTHESIS 0x20|KD_LSHIFT<<8
 #define NEXT_KEY_ASTERISK 0x1E|KD_LSHIFT<<8
@@ -118,8 +143,13 @@ uint16_t ascii2next[256];
 #define NEXT_KEY_CLOSING_BRACE 0x04|KD_LSHIFT<<8
 #define NEXT_KEY_TILDE 0x26|KD_LSHIFT<<8
 #define NEXT_KEY_DELETE 0x1B|KD_LSHIFT<<8 // FIXME: Made it up
+#define NEXT_KEY_ARROW_RIGHT 0x10
+#define NEXT_KEY_ARROW_LEFT 0x09
+#define NEXT_KEY_ARROW_DOWN 0x0F
+#define NEXT_KEY_ARROW_UP 0x16
 
-void ascii_init() {
+
+void ascii2next_init() {
   ascii2next[8] = NEXT_KEY_BACKSPACE;
   ascii2next[9] = NEXT_KEY_HORIZONTAL_TAB;
   ascii2next[10] = NEXT_KEY_ENTER;
@@ -222,4 +252,68 @@ void ascii_init() {
   ascii2next[0x7F] = NEXT_KEY_DELETE;
 }
 
+void hid2next_init() {
+  hid2next[HID_KEY_BACKSPACE] = NEXT_KEY_BACKSPACE;
+  hid2next[HID_KEY_TAB] = NEXT_KEY_HORIZONTAL_TAB;
+  hid2next[HID_KEY_ENTER] = NEXT_KEY_ENTER;
+  hid2next[HID_KEY_ESCAPE] = NEXT_KEY_ESCAPE;
+  hid2next[HID_KEY_SPACE] = NEXT_KEY_SPACE;
+  hid2next[HID_KEY_APOSTROPHE] = NEXT_KEY_SINGLE_QUOTE;
+  hid2next[HID_KEY_COMMA] = NEXT_KEY_COMMA;
+  hid2next[HID_KEY_MINUS] = NEXT_KEY_MINUS;
+  hid2next[HID_KEY_PERIOD] = NEXT_KEY_PERIOD;
+  hid2next[HID_KEY_SLASH] = NEXT_KEY_SLASH;
+  hid2next[HID_KEY_0] = NEXT_KEY_ZERO;
+  hid2next[HID_KEY_1] = NEXT_KEY_ONE;
+  hid2next[HID_KEY_2] = NEXT_KEY_TWO;
+  hid2next[HID_KEY_3] = NEXT_KEY_THREE;
+  hid2next[HID_KEY_4] = NEXT_KEY_FOUR;
+  hid2next[HID_KEY_5] = NEXT_KEY_FIVE;
+  hid2next[HID_KEY_6] = NEXT_KEY_SIX;
+  hid2next[HID_KEY_7] = NEXT_KEY_SEVEN;
+  hid2next[HID_KEY_8] = NEXT_KEY_EIGHT;
+  hid2next[HID_KEY_9] = NEXT_KEY_NINE;
+  hid2next[HID_KEY_SEMICOLON] = NEXT_KEY_SEMICOLON;
+  hid2next[HID_KEY_EQUAL] = NEXT_KEY_EQUALS;
+  hid2next[HID_KEY_BRACKET_LEFT] = NEXT_KEY_OPENING_BRACKET;
+  hid2next[HID_KEY_BACKSLASH] = NEXT_KEY_BACKSLASH;
+  hid2next[HID_KEY_BRACKET_RIGHT] = NEXT_KEY_CLOSING_BRACKET;
+  hid2next[HID_KEY_GRAVE] = NEXT_KEY_GRAVE_ACCENT;
+  hid2next[HID_KEY_A] = NEXT_KEY_LOWERCASE_A;
+  hid2next[HID_KEY_B] = NEXT_KEY_LOWERCASE_B;
+  hid2next[HID_KEY_C] = NEXT_KEY_LOWERCASE_C;
+  hid2next[HID_KEY_D] = NEXT_KEY_LOWERCASE_D;
+  hid2next[HID_KEY_E] = NEXT_KEY_LOWERCASE_E;
+  hid2next[HID_KEY_F] = NEXT_KEY_LOWERCASE_F;
+  hid2next[HID_KEY_G] = NEXT_KEY_LOWERCASE_G;
+  hid2next[HID_KEY_H] = NEXT_KEY_LOWERCASE_H;
+  hid2next[HID_KEY_I] = NEXT_KEY_LOWERCASE_I;
+  hid2next[HID_KEY_J] = NEXT_KEY_LOWERCASE_J;
+  hid2next[HID_KEY_K] = NEXT_KEY_LOWERCASE_K;
+  hid2next[HID_KEY_L] = NEXT_KEY_LOWERCASE_L;
+  hid2next[HID_KEY_M] = NEXT_KEY_LOWERCASE_M;
+  hid2next[HID_KEY_N] = NEXT_KEY_LOWERCASE_N;
+  hid2next[HID_KEY_O] = NEXT_KEY_LOWERCASE_O;
+  hid2next[HID_KEY_P] = NEXT_KEY_LOWERCASE_P;
+  hid2next[HID_KEY_Q] = NEXT_KEY_LOWERCASE_Q;
+  hid2next[HID_KEY_R] = NEXT_KEY_LOWERCASE_R;
+  hid2next[HID_KEY_S] = NEXT_KEY_LOWERCASE_S;
+  hid2next[HID_KEY_T] = NEXT_KEY_LOWERCASE_T;
+  hid2next[HID_KEY_U] = NEXT_KEY_LOWERCASE_U;
+  hid2next[HID_KEY_V] = NEXT_KEY_LOWERCASE_V;
+  hid2next[HID_KEY_W] = NEXT_KEY_LOWERCASE_W;
+  hid2next[HID_KEY_X] = NEXT_KEY_LOWERCASE_X;
+  hid2next[HID_KEY_Y] = NEXT_KEY_LOWERCASE_Y;
+  hid2next[HID_KEY_Z] = NEXT_KEY_LOWERCASE_Z;
+  hid2next[HID_KEY_DELETE] = NEXT_KEY_DELETE;
+  hid2next[HID_KEY_ARROW_RIGHT] = NEXT_KEY_ARROW_RIGHT;
+  hid2next[HID_KEY_ARROW_LEFT] = NEXT_KEY_ARROW_LEFT;
+  hid2next[HID_KEY_ARROW_DOWN] = NEXT_KEY_ARROW_DOWN;
+  hid2next[HID_KEY_ARROW_UP] = NEXT_KEY_ARROW_UP;
+}
+
+void next_keycodes_init() {
+  ascii2next_init();
+  hid2next_init();
+}
 #endif
