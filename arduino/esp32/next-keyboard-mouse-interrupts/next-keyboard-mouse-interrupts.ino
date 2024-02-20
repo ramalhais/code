@@ -79,7 +79,7 @@
 
 #ifdef RGB_ENABLED
 #define N_PIXELS 1
-#define PIXEL_FORMAT NEO_GRB+NEO_KHZ800
+#define PIXEL_FORMAT NEO_GRB//+NEO_KHZ800
 Adafruit_NeoPixel pixels(N_PIXELS, RGB_PIN, PIXEL_FORMAT);
 
 void neopixel_init() {
@@ -332,20 +332,17 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_read_interrupt() {
 
   if (state == STATE_WAITING) {
     all_high_counter = (all_high_counter * val) + val;
-    if (all_high_counter == 5) {  // sense 8 continuous bits high. works with some resets. also works from 1 to 8. 5 seems to work best
+    if (all_high_counter == 9) {  // sense continuous bits high
       all_high_counter = 0;
-      bits = 0;
-      data = 0;
-      read_data_ready = false;
       state = STATE_READY;
     } else {
     }
   } else if (state == STATE_READY) {
     if (val == 0) {
+      read_data_ready = false;
       data = 0;
-      bits++;
+      bits = 1;
       state = STATE_READING;
-      // digitalWrite(PIN_FROM_KBD, 1);
     }
   } else if (state == STATE_READING) {
     bits++;
@@ -359,11 +356,13 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_read_interrupt() {
   } else {
     bits++;
     if ((state == STATE_SHORT_READ && bits == 11) || (state == STATE_LONG_READ && bits == 23)) {  // 11 bits including start and stop bit
-      state = STATE_WAITING;
       read_data = data;
       read_data_ready = true;
-      timerDetachInterrupt(next_keyboard_timer);
-      timerAttachInterrupt(next_keyboard_timer, &next_keyboard_write_interrupt, false);
+      if (state == STATE_SHORT_READ) {
+        timerDetachInterrupt(next_keyboard_timer);
+        timerAttachInterrupt(next_keyboard_timer, &next_keyboard_write_interrupt, false);
+      }
+      state = STATE_READY;
     }
   }
 }
@@ -401,16 +400,18 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_write_interrupt() {
 
 void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
   static uint8_t pressed_keys[6] = {0,0,0,0,0,0};
+  static uint8_t last_modifiers = 0;
+
+  // Ignore Key Roll Over Overflow. All bytes will be 0x01
+  if (keycode[0] == 0x01)
+    return;
 
   // Send key release event and remove key for keys no longer pressed
   for(int p=0; p<6; p++) {
     if (pressed_keys[p]) {
       bool found = false;
 
-      for(int k=0; k<6; k++) {
-        if (keycode[k] == 0)
-          break;
-
+      for(int k=0; k<6 && keycode[k] != 0; k++) {
         if (pressed_keys[p] == keycode[k]) {
           found = true;
           break;
@@ -425,21 +426,24 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
     }
   }
 
-  // Add new pressed keys and send key pressed event
-  if (keycode[0] == 0) { // FIXME: attempt to send only modifiers when no keys pressed
+  // Send only modifiers when no keys pressed
+  bool modifiers_changed = last_modifiers != modifier;
+  last_modifiers = modifier;
+  if (keycode[0] == 0 & modifiers_changed) {
     queue_keyboard(0, false, hid2next_modifiers(modifier, HID_RCOMM));    
     return;
   }
 
+  // Add new pressed keys and send key pressed event
   int free = -1;
   bool found = false;
   for(int k=0; k<6; k++) {
     if (keycode[k] == 0)
       break;
 
-    if ((hid2next[keycode[k]] == NEXT_KEY_GRAVE_ACCENT) && ((hid2next_modifiers(modifier, HID_RCOMM)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT))) {
-          poweron_toggle();
-          continue;
+    if ((keycode[k] == HID_KEY_HOME) || ((hid2next[keycode[k]] == NEXT_KEY_KEYPAD_GRAVE_ACCENT) && ((hid2next_modifiers(modifier, HID_RCOMM)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT)))) {
+      poweron_toggle();
+      continue;
     }
 
     for(int p=0; p<6; p++) {
@@ -466,7 +470,7 @@ public:
 
     hid_keyboard_report_t *report = (hid_keyboard_report_t *)(transfer->data_buffer);
 
-    // Serial.printf("onKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
+    Serial.printf("\nonKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
     // Serial.printf("hid_modifiers=0x%x next_modifiers=0x%x\n", report->modifier, hid2next_modifiers(report->modifier, 0));
     usb_update_keys(report->keycode, report->modifier);
 //     for(int i=0; i<6; i++) {
@@ -645,13 +649,21 @@ int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn
   }
 
   if (tries) {
+    uint32_t _pressed = (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT;
+    uint32_t _key = ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT);
+    uint32_t _valid = (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT);
+    uint32_t _modifiers = ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT);
     keyboard_data = NEXT_KEYBOARD_DATA_PACKET |
-      ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT | // byte1
-      ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT); // byte2
+      _pressed | _key | // byte1
+      _valid | _modifiers; // byte2
     keyboard_data_ready = true;
-    Serial.printf("keyboard_data1=0x%x keyboard_data2=0x%x\n",
-      ((key&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_KEY_START_BIT) | (key && !pressed) << NEXT_KEYBOARD_KEY_PRESSED_BIT,
-      ((modifiers&NEXT_KEYBOARD_BYTE_MASK) << NEXT_KEYBOARD_MODIFIERS_START_BIT) | (((key&NEXT_KEYBOARD_BYTE_MASK) || (modifiers&NEXT_KEYBOARD_BYTE_MASK)) << NEXT_KEYBOARD_VALID_BIT)
+    Serial.printf("\npressed=0x%x, key=0x%x, valid=0x%x, modifiers=0x%x, byte1=0x%x byte2=0x%x\n",
+      _pressed>>NEXT_KEYBOARD_KEY_PRESSED_BIT,
+      _key>>NEXT_KEYBOARD_KEY_START_BIT,
+      _valid>>NEXT_KEYBOARD_VALID_BIT,
+      _modifiers>>NEXT_KEYBOARD_MODIFIERS_START_BIT,
+      _pressed|_key,
+      _valid|_modifiers
     );
     return true;
   } else {
@@ -769,7 +781,7 @@ void loop() {
       enable_key_enter = false;
       if (c == '%') {
         // Go to PROM
-        c = NEXT_KEY_GRAVE_ACCENT;
+        c = NEXT_KEY_KEYPAD_GRAVE_ACCENT;
         modifiers = KD_RCOMM;
       } else if (c == '^') {
         // Ctrl+C
