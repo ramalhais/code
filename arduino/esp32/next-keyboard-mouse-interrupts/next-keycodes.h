@@ -1,5 +1,6 @@
 // NeXT keycodes:
 // https://github.com/tmk/tmk_keyboard/blob/master/converter/next_usb/unimap_trans.h
+// https://github.com/tmk/tmk_keyboard/wiki/NeXT#keyboard-scan-code
 // https://web.archive.org/web/20150608141822/http://www.68k.org/~degs/nextkeyboard.html
 
 #include <class/hid/hid.h>

@@ -618,6 +618,11 @@ void print_byte(uint8_t byte) {
 }
 
 #define NEXT_KEYBOARD_FROM_KBD_INITIAL_LEVEL HIGH
+void next_keyboard_init_task(void *pvParameters) {
+    next_keyboard_init(&next_keyboard_timer);
+    vTaskDelete(NULL);
+}
+
 void next_keyboard_init(hw_timer_t **next_keyboard_timer) {
   pinMode(PIN_TO_KBD, INPUT_PULLUP);
   pinMode(PIN_FROM_KBD, OUTPUT);
@@ -736,7 +741,8 @@ void setup() {
   // USB Mouse. USB Soft Host needs to be initialized before next_keyboard_timer and next_mouse_timer below or USB won't work.
   usb_mouse_init();
   // This emulated NeXT Keyboard
-  next_keyboard_init(&next_keyboard_timer);
+  // next_keyboard_init(&next_keyboard_timer);
+  xTaskCreatePinnedToCore(next_keyboard_init_task, "next_keyboard_init_task", 2000, NULL, 6, NULL, 0);
   // Real NeXT Mouse
   next_mouse_init(&next_mouse_timer);
 
