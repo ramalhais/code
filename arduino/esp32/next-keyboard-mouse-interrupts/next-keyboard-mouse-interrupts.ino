@@ -198,11 +198,11 @@ inline void next_mouse_handle_changes() {
     dy = up ? -1 : 1;
   }
 
-  if (data.right != data_old.right) {
+  if (data.right != data_old.right || dx || dy) {
     button_right = data.right;
   }
 
-  if (data.left != data_old.left) {
+  if (data.left != data_old.left || dx || dy) {
     button_left = data.left;
   }
 
