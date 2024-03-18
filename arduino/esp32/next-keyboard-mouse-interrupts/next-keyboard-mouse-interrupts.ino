@@ -4,6 +4,9 @@
 #include <ADebouncer.h>
 #include "next-keycodes.h"
 
+hw_timer_t *next_keyboard_timer;
+hw_timer_t *next_mouse_timer;
+
 #if ARDUHAL_LOG_LEVEL >= ARDUHAL_LOG_LEVEL_INFO//ARDUHAL_LOG_LEVEL_DEBUG
   #define DEBUG_ALL
 #endif
@@ -256,6 +259,10 @@ void next_mouse_init(hw_timer_t **next_mouse_timer) {
   timerSetAutoReload(*next_mouse_timer, true);
   timerAlarmEnable(*next_mouse_timer);
 }
+void next_mouse_init_task(void *pvParameters) {
+    next_mouse_init(&next_mouse_timer);
+    vTaskDelete(NULL);
+}
 
 // https://github.com/tmk/tmk_keyboard/issues/704
 // Also: ASIC pdf says the clock is 18958Hz. 1/18958 = 0.00005274818 with 2% tolerance: (~ 51.72 - 52.75 - 53.80 microseconds)
@@ -289,9 +296,6 @@ void next_mouse_init(hw_timer_t **next_mouse_timer) {
 #define NEXT_KEYBOARD_MOUSE_X_START_BIT (NEXT_KEYBOARD_MOUSE_BUTTON1_BIT+1)
 #define NEXT_KEYBOARD_MOUSE_BUTTON2_BIT 12
 #define NEXT_KEYBOARD_MOUSE_Y_START_BIT (NEXT_KEYBOARD_MOUSE_BUTTON2_BIT+1)
-
-hw_timer_t *next_keyboard_timer;
-hw_timer_t *next_mouse_timer;
 
 enum next_keyboard_read_interrupt_state_e {
   STATE_WAITING,
@@ -470,7 +474,7 @@ public:
 
     hid_keyboard_report_t *report = (hid_keyboard_report_t *)(transfer->data_buffer);
 
-    Serial.printf("\nonKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
+    // Dprintf("\nonKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
     // Serial.printf("hid_modifiers=0x%x next_modifiers=0x%x\n", report->modifier, hid2next_modifiers(report->modifier, 0));
     usb_update_keys(report->keycode, report->modifier);
 //     for(int i=0; i<6; i++) {
@@ -618,11 +622,6 @@ void print_byte(uint8_t byte) {
 }
 
 #define NEXT_KEYBOARD_FROM_KBD_INITIAL_LEVEL HIGH
-void next_keyboard_init_task(void *pvParameters) {
-    next_keyboard_init(&next_keyboard_timer);
-    vTaskDelete(NULL);
-}
-
 void next_keyboard_init(hw_timer_t **next_keyboard_timer) {
   pinMode(PIN_TO_KBD, INPUT_PULLUP);
   pinMode(PIN_FROM_KBD, OUTPUT);
@@ -634,11 +633,20 @@ void next_keyboard_init(hw_timer_t **next_keyboard_timer) {
   timerSetAutoReload(*next_keyboard_timer, true);
   timerAlarmEnable(*next_keyboard_timer);
 }
+void next_keyboard_init_task(void *pvParameters) {
+    next_keyboard_init(&next_keyboard_timer);
+    vTaskDelete(NULL);
+}
 
 void usb_mouse_init() {
+  USH.setTaskCore(1);
   USH.init(USB_Pins_Config, NULL, NULL);
   USH.setPrintCb(ush_handle_data);
   USH.setOnIfaceDescCb(ush_handle_interface_descriptor);
+}
+void usb_mouse_init_task(void *pvParameters) {
+    usb_mouse_init();
+    vTaskDelete(NULL);
 }
 
 char c = 0;
@@ -740,11 +748,13 @@ void setup() {
 #endif
   // USB Mouse. USB Soft Host needs to be initialized before next_keyboard_timer and next_mouse_timer below or USB won't work.
   usb_mouse_init();
+  // xTaskCreatePinnedToCore(usb_mouse_init_task, "usb_mouse_init_task", 2000, NULL, 6, NULL, 1); // Gives guru meditation error :(
   // This emulated NeXT Keyboard
   // next_keyboard_init(&next_keyboard_timer);
   xTaskCreatePinnedToCore(next_keyboard_init_task, "next_keyboard_init_task", 2000, NULL, 6, NULL, 0);
   // Real NeXT Mouse
-  next_mouse_init(&next_mouse_timer);
+  // next_mouse_init(&next_mouse_timer);
+  xTaskCreatePinnedToCore(next_mouse_init_task, "next_mouse_init_task", 2000, NULL, 6, NULL, 1);
 
 #ifdef RGB_ENABLED
   neopixel_set(0, 16, 0); // GREEN
@@ -846,15 +856,15 @@ void loop() {
 
       Dprintf("\n");
     } else {
-      Dprintf("?");
-      // print_byte((read_data >> 16) & 0xff);
-      // print_byte((read_data >> 8) & 0xff);
-      // print_byte(read_data & 0xff);
-      // Dprintf("\n");
+      Dprintf("?\n");
+      print_byte((read_data >> 16) & 0xff);
+      print_byte((read_data >> 8) & 0xff);
+      print_byte(read_data & 0xff);
+      Dprintf("\n");
     }
     read_data_ready = false;
   }
-  // delay(10); // Somehow queue_keyboard can't be fast enough? weird
+  delay(100); // Don't hog the cpu
 #ifdef RGB_ENABLED
   neopixel_set(0, 16, 0); // GREEN
 #endif
