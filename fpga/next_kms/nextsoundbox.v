@@ -261,13 +261,21 @@ module NextSoundBox (
     // assign spdif_led0 = audio_sample_request_mode;
     
     wire data_loss;
+
+    wire fake_sound;
+    assign fake_sound = 1;
+    wire audio_sample_request_mode_fake;
+    wire audio_sample_request_tick_fake;
+    assign audio_sample_request_mode_fake = fake_sound;//(is_audio_sample && fake_sound) || audio_sample_request_mode;
+    assign audio_sample_request_tick_fake = fake_sound;//(is_audio_sample && fake_sound) || audio_sample_request_tick;
+
     Sender sender(
         mon_clk,
         out_data,
         out_valid,
-        audio_sample_request_mode,
+        audio_sample_request_mode_fake,//audio_sample_request_mode,
         audio_sample_request_underrun,
-        audio_sample_request_tick,
+        audio_sample_request_tick_fake,//audio_sample_request_tick,
         from_mon,
         data_loss,
         out_data_retrieved,
