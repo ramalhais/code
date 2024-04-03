@@ -1,11 +1,23 @@
-IO_LOC  "debug[0]" 33;
-IO_PORT "debug[0]" IO_TYPE=LVCMOS33;
+IO_LOC  "audio_data" 27;
+IO_PORT "audio_data" IO_TYPE=LVCMOS33;
 
-IO_LOC  "debug[1]" 34;
-IO_PORT "debug[1]" IO_TYPE=LVCMOS33;
+IO_LOC  "audio_lrck" 28;
+IO_PORT "audio_lrck" IO_TYPE=LVCMOS33;
 
-IO_LOC  "debug[2]" 40;
-IO_PORT "debug[2]" IO_TYPE=LVCMOS33;
+IO_LOC  "audio_bclk" 29;
+IO_PORT "audio_bclk" IO_TYPE=LVCMOS33;
+
+IO_LOC  "audio_mclk" 30;
+IO_PORT "audio_mclk" IO_TYPE=LVCMOS33;
+
+IO_LOC  "mic_data" 33;
+IO_PORT "mic_data" IO_TYPE=LVCMOS33;
+
+IO_LOC  "mic_lrck" 34;
+IO_PORT "mic_lrck" IO_TYPE=LVCMOS33;
+
+IO_LOC  "mic_bclk" 40;
+IO_PORT "mic_bclk" IO_TYPE=LVCMOS33;
 
 IO_LOC  "mc_miso" 35;
 IO_PORT "mc_miso" IO_TYPE=LVCMOS33;

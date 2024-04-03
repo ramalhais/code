@@ -1,8 +1,6 @@
-// Needs Arduino board esp32 <= 2.0.11 selected in boards manager, for ESP32-USB-Soft-Host to work
-//#define FORCE_TEMPLATED_NOPS
-#include <ESP32-USB-Soft-Host.h>
 #include <ADebouncer.h>
 #include "next-keycodes.h"
+#include <cppQueue.h>
 
 hw_timer_t *next_keyboard_timer;
 hw_timer_t *next_mouse_timer;
@@ -18,14 +16,13 @@ hw_timer_t *next_mouse_timer;
 #endif
 
 #if defined(ARDUINO_ESP32S3_DEV)
-  // ESP32S3_DEV only
-  #include <Adafruit_NeoPixel.h>
-  #include <EspUsbHostKeybord.h>
-  #define RGB_PIN 48
-  #define RGB_ENABLED 1
-  #define USB_HOST_ENABLED 1
-
   // ESP32S3_DEV: Don't use: strapping pins: 0,3,45,46. PSRAM: 35,36,37. USB: 19,20. Serial UART: 43,44
+
+  // #define RGB_ENABLED 1
+  // #define USB_HOST_ENABLED 1 // Hardware USB Host
+  // #define USB_SOFTHOST_ENABLED 1 // Software USB Host
+
+  #define RGB_PIN 48
 
   // This NeXT Keyboard Pins
   #define PIN_TO_KBD 4    // Input to this keyboard
@@ -50,6 +47,9 @@ hw_timer_t *next_mouse_timer;
   #define NEXT_MOUSE_YB_PIN 17 // mouse pin 5
   #define NEXT_MOUSE_RIGHT_PIN 18 // mouse pin 6
   #define NEXT_MOUSE_LEFT_PIN 8 // mouse pin 7
+
+  #define USB_SERIAL_RX 9
+  #define USB_SERIAL_TX 10
 
 #elif defined(ARDUINO_ESP32_DEV)
 
@@ -81,6 +81,8 @@ hw_timer_t *next_mouse_timer;
 #endif
 
 #ifdef RGB_ENABLED
+#include <Adafruit_NeoPixel.h>
+
 #define N_PIXELS 1
 #define PIXEL_FORMAT NEO_GRB//+NEO_KHZ800
 Adafruit_NeoPixel pixels(N_PIXELS, RGB_PIN, PIXEL_FORMAT);
@@ -183,7 +185,7 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_mouse_read_interrupt() {
 
 #define QUADRATIC_DECODER_BITS 0b0100000110000010;
 
-int queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2);
+bool queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2);
 
 inline void next_mouse_handle_changes() {
   int dx = 0, dy = 0;
@@ -201,15 +203,7 @@ inline void next_mouse_handle_changes() {
     dy = up ? -1 : 1;
   }
 
-  if (data.right != data_old.right || dx || dy) {
-    button_right = data.right;
-  }
-
-  if (data.left != data_old.left || dx || dy) {
-    button_left = data.left;
-  }
-
-  queue_mouse_from_interrupt(dx, dy, button_left, button_right);
+  queue_mouse_from_interrupt(dx, dy, data.left, data.right);
 }
 
 void next_mouse_print_changes() {
@@ -407,8 +401,10 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
   static uint8_t last_modifiers = 0;
 
   // Ignore Key Roll Over Overflow. All bytes will be 0x01
-  if (keycode[0] == 0x01)
+  if (keycode[0] == 0x01) {
+    Serial.printf("\nWARNING: Key Roll Over Overflow\n");
     return;
+  }
 
   // Send key release event and remove key for keys no longer pressed
   for(int p=0; p<6; p++) {
@@ -468,6 +464,8 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
 
 // USB Host HID Keyboard stuff
 #ifdef USB_HOST_ENABLED
+#include <EspUsbHostKeybord.h>
+
 class MyEspUsbHostKeybord : public EspUsbHostKeybord {
 public:
   void onKey(usb_transfer_t *transfer) {
@@ -500,7 +498,11 @@ public:
 MyEspUsbHostKeybord usbHost;
 #endif
 
-// USB Soft Host stuff
+#ifdef USB_SOFTHOST_ENABLED // USB Soft Host stuff
+// Needs Arduino board esp32 <= 2.0.11 selected in boards manager, for ESP32-USB-Soft-Host to work
+//#define FORCE_TEMPLATED_NOPS
+#include <ESP32-USB-Soft-Host.h>
+
 #define HID_INTERFACE_PROTO_KEYBOARD 1
 #define HID_INTERFACE_PROTO_MOUSE 2
 #define APP_USBD_HID_SUBCLASS_BOOT 1
@@ -512,12 +514,21 @@ void ush_handle_interface_descriptor(uint8_t ref, int cfgCount, int sIntfCount, 
     sIntf->iProto == HID_INTERFACE_PROTO_KEYBOARD ? "Keyboard" : (sIntf->iProto == HID_INTERFACE_PROTO_MOUSE ? "Mouse" : String(sIntf->iProto)),
     ref, cfgCount, sIntfCount);
 }
+#endif
 
 #define USB_MOUSE_BUTTON_LEFT_MASK   1<<0
 #define USB_MOUSE_BUTTON_RIGHT_MASK  1<<1
 #define USB_MOUSE_BUTTON_MIDDLE_MASK 1<<2
 #define USB_MOUSE_SCROLL_UP    1
 #define USB_MOUSE_SCROLL_DOWN  -1
+
+typedef struct {
+  uint8_t button; // 1=left,2=right,4=middle
+  int8_t x;  // signed. >0 RIGHT, <0 LEFT
+  int8_t y;  // signed. >0 DOWN, <0 UP
+  int8_t scroll; // 1==up 0xff==down
+} usb_mouse_data_4bytes_t; // Microsoft Wheel Mouse Optical 1.1A USB and PS/2 Compatible
+
 typedef struct {
   uint8_t byte0;  // Always 0x1
   uint8_t button; // 1=left,2=right,4=middle
@@ -528,11 +539,13 @@ typedef struct {
 } usb_mouse_data_6bytes_t; // No name "3D Optical Mouse"
 
 typedef struct {
+  uint8_t byte0;  // Always 0x1A
   uint8_t button; // 1=left,2=right,4=middle
-  int8_t x;  // signed. >0 RIGHT, <0 LEFT
-  int8_t y;  // signed. >0 DOWN, <0 UP
-  int8_t scroll; // 1==up 0xff==down
-} usb_mouse_data_4bytes_t; // Microsoft Wheel Mouse Optical 1.1A USB and PS/2 Compatible
+  int16_t x;  // signed. >0 RIGHT, <0 LEFT
+  int16_t y;  // signed. >0 DOWN, <0 UP
+  int16_t scroll; // 1==SCROLL_DOWN 0xffff==SCROLL_UP
+  int16_t hscroll; // 1==SCROLL_LEFT 0xffff==SCROLL_RIGHT
+} usb_mouse_data_10bytes_t; // No name "3D Optical Mouse"
 
 #define USB_MOUSE_4BYTES_NAME "USB Mouse (4 Bytes)"
 static void handle_mouse_data_4bytes(uint8_t* data) {
@@ -570,6 +583,30 @@ static void handle_mouse_data_6bytes(uint8_t* data) {
   // );
 }
 
+#define USB_MOUSE_10BYTES_NAME "USB Mouse/Touchpad (10 Bytes)"
+static void handle_mouse_data_10bytes(uint8_t* data) {
+  usb_mouse_data_10bytes_t *mouse_data = (usb_mouse_data_10bytes_t *)data;
+
+  queue_mouse_from_interrupt(
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK,
+    mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK
+  );
+
+  Dprintf("\n%s: L=%d R=%d M=%d X=%d Y=%d S=%s HS=%s\n",
+    USB_MOUSE_10BYTES_NAME,
+    (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
+    (bool)(mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK),
+    (bool)(mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK),
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->scroll < 0 ? "UP" : (mouse_data->scroll > 0 ? "DOWN" : "_"),
+    mouse_data->hscroll < 0 ? "RIGHT" : (mouse_data->hscroll > 0 ? "LEFT" : "_")
+  );
+}
+
+#ifdef USB_SOFTHOST_ENABLED
 // FIXME: Instead of this hack, we should get the mouse report descriptor, and parse it to know where the data really is
 static void ush_handle_data(uint8_t usbNum, uint8_t byte_depth, uint8_t* data, uint8_t data_len)
 {
@@ -597,6 +634,7 @@ usb_pins_config_t USB_Pins_Config =
   DP_P2, DM_P2,
   DP_P3, DM_P3
 };
+#endif
 
 const char* bit_rep[16] = {
   [0] = "0000",
@@ -638,6 +676,7 @@ void next_keyboard_init_task(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
+#ifdef USB_SOFTHOST_ENABLED
 void usb_mouse_init() {
   USH.setTaskCore(1);
   USH.init(USB_Pins_Config, NULL, NULL);
@@ -648,6 +687,7 @@ void usb_mouse_init_task(void *pvParameters) {
     usb_mouse_init();
     vTaskDelete(NULL);
 }
+#endif
 
 char c = 0;
 char modifiers = 0;
@@ -685,8 +725,9 @@ int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn
   }
 }
 
-int queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2) {
+bool queue_mouse_from_interrupt(int8_t mousex, int8_t mousey, bool button1, bool button2) {
   int tries = 10;
+
   while (tries && mouse_data_ready) { // TODO: we really need to turn this into a real queue or update data. We can't have a while loop and a delay during an interrupt
     delayMicroseconds(NEXT_KEYBOARD_TIMING_100NS/10);
     tries--;
@@ -726,7 +767,103 @@ void next_keyboard_mouse_print_changes() {
     bool button2 = mouse_data&(1<<NEXT_KEYBOARD_MOUSE_BUTTON2_BIT);
     uint8_t dx = (mouse_data>>NEXT_KEYBOARD_MOUSE_X_START_BIT)&NEXT_KEYBOARD_BYTE_MASK;
     uint8_t dy = (mouse_data>>NEXT_KEYBOARD_MOUSE_Y_START_BIT)&NEXT_KEYBOARD_BYTE_MASK;
-    Dprintf("\nmouse_data on wire: L=%d R=%d dx=0x%x dy=0x%x mouse_data=0x%x \n", button1, button2, dx, dy, mouse_data);
+    Dprintf("\nmouse_data on wire: L=%d R=%d dx=0x%x dy=0x%x mouse_data=0x%x \n", button1, button2, dx, dy, mouse_data); // FIXME: it's always printing after first click on button2, even when no change. why?
+  }
+}
+
+typedef struct {
+  uint8_t type;
+  uint8_t len;
+  uint8_t labeling;
+  uint8_t data[72];
+  uint8_t serial;
+  uint8_t checksum;
+} USBKMSerialEvent;
+
+cppQueue USBKMSerialQueue(sizeof(USBKMSerialEvent), 20, FIFO, false);
+
+enum {
+  USB_IDLE,
+  USB_INIT1,
+  USB_INIT2,
+  USB_STATUS_REQ_FRAME,
+  USB_VALID_FRAME,
+  USB_VALID_FRAME_88,
+  USB_FRAME_LENGTH,
+  USB_FRAME_DATA,
+  USB_FRAME_DATA_DONE,
+  USB_FRAME_SERIAL,
+  USB_FINISH
+};
+
+void USBKMSerialOnReceiveCb() {
+  static int state = USB_IDLE;
+  static uint8_t len_left = 0;
+  USBKMSerialEvent ev;
+
+  while(Serial1.available() && state != USB_FINISH) {
+    char c = Serial1.read();
+    switch (state) {
+      case USB_IDLE:
+        if (c == 0x57)
+          state = USB_INIT1;
+        break;
+      case USB_INIT1:
+        if (c == 0xAB)
+          state = USB_INIT2;
+        break;
+      case USB_INIT2:
+        switch(c) {
+          case 0x82:
+            ev.type = USB_STATUS_REQ_FRAME;
+            state = USB_STATUS_REQ_FRAME;
+            break;
+          case 0x83:
+            ev.type = USB_VALID_FRAME;
+            state = USB_VALID_FRAME;
+            break;
+          case 0x88:
+            ev.type = USB_VALID_FRAME_88;
+            state = USB_VALID_FRAME_88;
+            break;
+        }
+        break;
+      case USB_STATUS_REQ_FRAME:
+        state = USB_FINISH;
+        break;
+      case USB_VALID_FRAME:
+      case USB_VALID_FRAME_88:
+        bzero(&ev, sizeof(ev));
+        ev.len = c;
+        len_left = ev.len-3;
+        state = USB_FRAME_LENGTH;
+        break;
+      case USB_FRAME_LENGTH:
+        ev.labeling = c;
+        state = USB_FRAME_DATA;
+        break;
+      case USB_FRAME_DATA:
+        ev.data[ev.len-3-len_left] = c;
+        len_left--;
+        if (!len_left)
+          state = USB_FRAME_DATA_DONE;
+        break;
+      case USB_FRAME_DATA_DONE:
+        ev.serial = c;
+        state = USB_FRAME_SERIAL;
+        break;
+      case USB_FRAME_SERIAL:
+        ev.checksum = c;
+        if (!USBKMSerialQueue.push(&ev)) {
+          Serial.printf("\nWARNING: failed to push KM data to queue\n");
+        }
+        state = USB_FINISH;
+        break;
+    }
+  }
+
+  if (state == USB_FINISH) {
+    state = USB_IDLE;
   }
 }
 
@@ -738,17 +875,26 @@ void setup() {
   Serial.begin(115200);
   Serial.printf("Starting NeXT Keyboard\n");
 
+  // Serial for USB chip WCH CH9350
+  Serial1.begin(115200, SERIAL_8N1, USB_SERIAL_RX, USB_SERIAL_TX);
+  Serial1.onReceive(USBKMSerialOnReceiveCb);
+
   // Setup POWER_ON pin
   poweron_init();
   // Setup ASCII to NeXT and HID to NeXT keycode tables
   next_keycodes_init();
+
 #ifdef USB_HOST_ENABLED
   // Hardware USB Host
   usbHost.begin();
 #endif
+
+#ifdef USB_SOFTHOST_ENABLED
   // USB Mouse. USB Soft Host needs to be initialized before next_keyboard_timer and next_mouse_timer below or USB won't work.
   usb_mouse_init();
   // xTaskCreatePinnedToCore(usb_mouse_init_task, "usb_mouse_init_task", 2000, NULL, 6, NULL, 1); // Gives guru meditation error :(
+#endif
+
   // This emulated NeXT Keyboard
   // next_keyboard_init(&next_keyboard_timer);
   xTaskCreatePinnedToCore(next_keyboard_init_task, "next_keyboard_init_task", 2000, NULL, 6, NULL, 0);
@@ -767,10 +913,33 @@ void loop() {
   usbHost.task();
 #endif
 
+  while (!USBKMSerialQueue.isEmpty()) {
+    USBKMSerialEvent ev;
+    USBKMSerialQueue.pop(&ev);
+    if ((ev.labeling&0x30) == 0x10) {
+      usb_update_keys(&ev.data[2], ev.data[0]);
+    } else if ((ev.labeling&0x30) == 0x20) {
+      if ((ev.len-3) == 4) {
+        handle_mouse_data_4bytes(&ev.data[0]);
+      } else if ((ev.len-3) == 6) {
+        handle_mouse_data_6bytes(&ev.data[0]);
+      } else if ((ev.len-3) == 10) {
+        handle_mouse_data_10bytes(&ev.data[0]);
+      } else {
+        Serial.printf("WARNING: Unknown mouse data length=%d. data=0x%x %x %x %x %x %x %x %x %x %x\n", ev.len-3, ev.data[0], ev.data[1], ev.data[2], ev.data[3], ev.data[4], ev.data[5], ev.data[6], ev.data[7], ev.data[8], ev.data[9]);
+      }
+    } else if ((ev.labeling&0x30) == 0x30) {
+      Serial.printf("\nWARNING: multimedia keyboard\n");
+    } else if ((ev.labeling&0x30) == 0x00) {
+      Serial.printf("\nWARNING: other USB device\n");
+    }
+    // Serial.printf("\nlen=%d data_len=%d labeling=0x%x data=0x%x %x %x %x %x %x %x %x serial=%d checksum=0x%x\n", ev.len, ev.len-3, ev.labeling&0x30, ev.data[0], ev.data[1], ev.data[2], ev.data[3], ev.data[4], ev.data[5], ev.data[6], ev.data[7], ev.serial, ev.checksum);
+  }
+
   static bool enable_key_enter = false;
 
   // next_mouse_print_changes();
-  next_keyboard_mouse_print_changes();
+  // next_keyboard_mouse_print_changes();
 
   if (c == 0 && Serial.available()) {
 #ifdef RGB_ENABLED
@@ -864,7 +1033,7 @@ void loop() {
     }
     read_data_ready = false;
   }
-  delay(100); // Don't hog the cpu
+  delay(10/*100*/); // Don't hog the cpu
 #ifdef RGB_ENABLED
   neopixel_set(0, 16, 0); // GREEN
 #endif

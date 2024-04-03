@@ -20,7 +20,7 @@ module NextSoundBox (
     input mic_lrck,
     input mic_data,
     
-    input audio_mclk,
+    // input audio_mclk,
     output audio_bclk,
     output audio_lrck,
     output audio_data,
@@ -51,11 +51,33 @@ module NextSoundBox (
         data_recv
     );
     
-    Divider#(.DIVISOR(8), .W(3)) sck_div( // generate BCLK
-        audio_mclk,
-        audio_bclk
-    );
-    
+    // Divider#(.DIVISOR(8), .W(3)) sck_div( // generate BCLK
+    //     audio_mclk,
+    //     audio_bclk
+    // );
+
+    reg[4:0] counter = 0;
+    reg[4:0] counter2 = 0;
+    reg audio_bclk_reg = 0;
+    assign audio_bclk = audio_bclk_reg;
+    always @(posedge clk27) begin
+		if (counter+counter2 >= (19-1)) begin
+			counter <= 0;
+            audio_bclk_reg <= ~audio_bclk_reg;
+        end
+		else begin
+			counter <= counter + 1'b1;
+		end
+	end
+    always @(negedge clk27) begin
+		if (counter+counter2 >= (19-1)) begin
+			counter2 <= 0;
+        end
+		else begin
+			counter2 <= counter2 + 1'b1;
+		end
+	end
+
     wire is_audio_sample, audio_starts, audio_22khz, audio_22khz_repeats, end_audio_sample, all_1_packet, power_on_packet_R1, keyboard_led_update,
          attenuation_data_valid, mic_start, mic_stop;
     wire [7:0] attenuation_data;
@@ -273,9 +295,9 @@ module NextSoundBox (
         mon_clk,
         out_data,
         out_valid,
-        audio_sample_request_mode_fake,//audio_sample_request_mode,
+        audio_sample_request_mode_fake,//audio_sample_request_mode,//
         audio_sample_request_underrun,
-        audio_sample_request_tick_fake,//audio_sample_request_tick,
+        audio_sample_request_tick_fake,//audio_sample_request_tick,//
         from_mon,
         data_loss,
         out_data_retrieved,

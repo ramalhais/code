@@ -1,34 +1,49 @@
 module next_kms
 (
     input clk,
-    input btn1,
-    input btn2,
-    output [5:0] led,
+
+    // for Keyboard
+    input from_kb,
+    output to_kb,
 
     // for NeXT computer
     input mon_clk, // NeXT pin 3 (mono/color)
     input to_mon, // NeXT pin 4 (mono/color)
     output from_mon, // NeXT pin 5 (mono/color)
 
-    // for Keyboard
-    input from_kb,
-    output to_kb,
-    output [2:0] debug
+    input mc_sck,
+    input mc_mosi,
+    input mc_ss,
+    output mc_miso,
+    
+    input mic_bclk,
+    input mic_lrck,
+    input mic_data,
+    
+    input audio_mclk,
+    output audio_bclk,
+    output audio_lrck,
+    output audio_data,
+
+    input btn1,
+    input btn2,
+    output [5:0] led
+    // output [2:0] debug
 );
 
 
 // Unused
 wire hw_reset_n;
 wire spdif_led0;
+wire [2:0] debug;
+// wire mic_bclk;
+// wire mic_lrck;
+// wire mic_data;
 
-wire mic_bclk;
-wire mic_lrck;
-wire mic_data;
-
-wire audio_mclk;
-wire audio_bclk;
-wire audio_lrck;
-wire audio_data;
+// wire audio_mclk;
+// wire audio_bclk;
+// wire audio_lrck;
+// wire audio_data;
 
 wire [15:0] latest_keycode;
 wire latest_keycode_valid;
@@ -86,7 +101,7 @@ NextSoundBox nextsb(
     mic_lrck,
     mic_data,
 
-    audio_mclk,
+    // audio_mclk,
     audio_bclk,
     audio_lrck,
     audio_data,
