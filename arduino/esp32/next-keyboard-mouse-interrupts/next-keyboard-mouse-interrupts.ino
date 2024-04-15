@@ -396,10 +396,12 @@ void /*ARDUINO_ISR_ATTR*/ IRAM_ATTR next_keyboard_write_interrupt() {
   }
 }
 
-void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
+void usb_update_keys(uint8_t keycode[6], uint8_t modifiers, uint8_t modifiers2) {
   static uint8_t pressed_keys[6] = {0,0,0,0,0,0};
   static uint8_t last_modifiers = 0;
+  static uint8_t last_modifiers2 = 0;
 
+  Dprintf("\nUSB: modifiers=0x%x keycode=0x%x %x %x %x %x %x modifiers2=0x%x\n", modifiers, keycode[0], keycode[1], keycode[2], keycode[3], keycode[4], keycode[5], modifiers2);
   // Ignore Key Roll Over Overflow. All bytes will be 0x01
   if (keycode[0] == 0x01) {
     Serial.printf("\nWARNING: Key Roll Over Overflow\n");
@@ -417,21 +419,34 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
           break;
         }
       }
-
-#define HID_RCOMM 0
+//#define HID_RCOMM KEYBOARD_MODIFIER_RIGHTCTRL // For using right control as right command (right control will be unusable)
+#define HID_RCOMM 0 
       if (!found) {
-        queue_keyboard(hid2next[pressed_keys[p]], false, hid2next_modifiers(modifier, HID_RCOMM));
+        queue_keyboard(hid2next[pressed_keys[p]], false, hid2next_modifiers(modifiers, HID_RCOMM));
         pressed_keys[p] = 0;
       }
     }
   }
 
-  // Send only modifiers when no keys pressed
-  bool modifiers_changed = last_modifiers != modifier;
-  last_modifiers = modifier;
+  // When no keys pressed, send modifiers if changed
+  bool modifiers_changed = last_modifiers != modifiers;
+  last_modifiers = modifiers;
   if (keycode[0] == 0 & modifiers_changed) {
-    queue_keyboard(0, false, hid2next_modifiers(modifier, HID_RCOMM));    
+    queue_keyboard(0, false, hid2next_modifiers(modifiers, HID_RCOMM));
     return;
+  }
+  // bool modifiers2_changed = last_modifiers2 != modifiers2;
+  // last_modifiers2 = modifiers2;
+  // if (keycode[0] == 0 & modifiers2_changed) {
+  //   queue_keyboard(0, false, hid2next_modifiers(modifier2, HID_RCOMM));
+  //   return;
+  // }
+
+  // Use Apple Magic Keyboard Eject key as power toggle
+  #define USB_APPLE_MODIFIER2_EJECT 0x01
+  #define USB_APPLE_MODIFIER2_FN    0x02
+  if (modifiers2&USB_APPLE_MODIFIER2_EJECT) {
+    poweron_toggle();
   }
 
   // Add new pressed keys and send key pressed event
@@ -441,7 +456,7 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
     if (keycode[k] == 0)
       break;
 
-    if ((keycode[k] == HID_KEY_HOME) || ((hid2next[keycode[k]] == NEXT_KEY_KEYPAD_GRAVE_ACCENT) && ((hid2next_modifiers(modifier, HID_RCOMM)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT)))) {
+    if ((keycode[k] == HID_KEY_HOME) || ((hid2next[keycode[k]] == NEXT_KEY_KEYPAD_GRAVE_ACCENT) && ((hid2next_modifiers(modifiers, HID_RCOMM)&(KD_LCOMM|KD_LALT)) == (KD_LCOMM|KD_LALT)))) {
       poweron_toggle();
       continue;
     }
@@ -457,7 +472,7 @@ void usb_update_keys(uint8_t keycode[6], uint8_t modifier) {
 
     if (!found) {
       pressed_keys[free] = keycode[k];
-      queue_keyboard(hid2next[keycode[k]], true, hid2next_modifiers(modifier, HID_RCOMM));
+      queue_keyboard(hid2next[keycode[k]], true, hid2next_modifiers(modifiers, HID_RCOMM));
     }
   }
 }
@@ -474,7 +489,7 @@ public:
 
     // Dprintf("\nonKey %02x %02x %02x %02x %02x %02x %02x %02x\n", report->modifier, report->reserved, report->keycode[0], report->keycode[1], report->keycode[2], report->keycode[3], report->keycode[4], report->keycode[5]);
     // Serial.printf("hid_modifiers=0x%x next_modifiers=0x%x\n", report->modifier, hid2next_modifiers(report->modifier, 0));
-    usb_update_keys(report->keycode, report->modifier);
+    usb_update_keys(report->keycode, report->modifier, 0);
 //     for(int i=0; i<6; i++) {
 //       if (report->keycode[i] && report->keycode[i] != 1) {
 //         Serial.printf("p[%d]=0x%x\n", i, report->keycode[i]);
@@ -539,15 +554,28 @@ typedef struct {
 } usb_mouse_data_6bytes_t; // No name "3D Optical Mouse"
 
 typedef struct {
+  uint8_t byte0;  // Always 0x2
+  uint8_t button; // 1=left
+  int8_t x;  // signed. >0 RIGHT, <0 LEFT
+  int8_t y;  // signed. >0 DOWN, <0 UP
+  uint8_t byte4; // zero
+  uint8_t byte5; // zero
+  uint8_t byte6; // zero
+  uint8_t touch; // 1=touching
+  uint8_t byte8; // zero
+  uint8_t byte9; // zero
+} usb_mouse_data_8bytes_t; // Apple Magic Trackpad 2
+
+typedef struct {
   uint8_t byte0;  // Always 0x1A
   uint8_t button; // 1=left,2=right,4=middle
   int16_t x;  // signed. >0 RIGHT, <0 LEFT
   int16_t y;  // signed. >0 DOWN, <0 UP
   int16_t scroll; // 1==SCROLL_DOWN 0xffff==SCROLL_UP
   int16_t hscroll; // 1==SCROLL_LEFT 0xffff==SCROLL_RIGHT
-} usb_mouse_data_10bytes_t; // No name "3D Optical Mouse"
+} usb_mouse_data_10bytes_t; // Microsoft All-In-One Media Keyboard Touchpad
 
-#define USB_MOUSE_4BYTES_NAME "USB Mouse (4 Bytes)"
+#define USB_MOUSE_4BYTES_NAME "USB Mouse (4 Bytes) / Microsoft Wheel Mouse Optical 1.1A"
 static void handle_mouse_data_4bytes(uint8_t* data) {
   usb_mouse_data_4bytes_t *mouse_data = (usb_mouse_data_4bytes_t *)data;
 
@@ -559,7 +587,7 @@ static void handle_mouse_data_4bytes(uint8_t* data) {
   );
 }
 
-#define USB_MOUSE_6BYTES_NAME "USB Mouse (6 Bytes)"
+#define USB_MOUSE_6BYTES_NAME "USB Mouse (6 Bytes) / 3D Optical Mouse"
 static void handle_mouse_data_6bytes(uint8_t* data) {
   usb_mouse_data_6bytes_t *mouse_data = (usb_mouse_data_6bytes_t *)data;
 
@@ -583,7 +611,27 @@ static void handle_mouse_data_6bytes(uint8_t* data) {
   // );
 }
 
-#define USB_MOUSE_10BYTES_NAME "USB Mouse/Touchpad (10 Bytes)"
+#define USB_MOUSE_8BYTES_NAME "USB Mouse (8 Bytes) / Apple Magic Trackpad 2"
+static void handle_mouse_data_8bytes(uint8_t* data) {
+  usb_mouse_data_8bytes_t *mouse_data = (usb_mouse_data_8bytes_t *)data;
+
+  queue_mouse_from_interrupt(
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK,
+    mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK
+  );
+
+  Dprintf("\n%s: L=%d X=%d Y=%d TOUCH=%d\n",
+    USB_MOUSE_8BYTES_NAME,
+    (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
+    mouse_data->x,
+    mouse_data->y,
+    mouse_data->touch
+  );
+}
+
+#define USB_MOUSE_10BYTES_NAME "USB Mouse/MS All-In-One Media Keyboard Touchpad (10 Bytes)"
 static void handle_mouse_data_10bytes(uint8_t* data) {
   usb_mouse_data_10bytes_t *mouse_data = (usb_mouse_data_10bytes_t *)data;
 
@@ -594,16 +642,16 @@ static void handle_mouse_data_10bytes(uint8_t* data) {
     mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK || mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK
   );
 
-  Dprintf("\n%s: L=%d R=%d M=%d X=%d Y=%d S=%s HS=%s\n",
-    USB_MOUSE_10BYTES_NAME,
-    (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
-    (bool)(mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK),
-    (bool)(mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK),
-    mouse_data->x,
-    mouse_data->y,
-    mouse_data->scroll < 0 ? "UP" : (mouse_data->scroll > 0 ? "DOWN" : "_"),
-    mouse_data->hscroll < 0 ? "RIGHT" : (mouse_data->hscroll > 0 ? "LEFT" : "_")
-  );
+  // Dprintf("\n%s: L=%d R=%d M=%d X=%d Y=%d S=%s HS=%s\n",
+  //   USB_MOUSE_10BYTES_NAME,
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_LEFT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_RIGHT_MASK),
+  //   (bool)(mouse_data->button&USB_MOUSE_BUTTON_MIDDLE_MASK),
+  //   mouse_data->x,
+  //   mouse_data->y,
+  //   mouse_data->scroll < 0 ? "UP" : (mouse_data->scroll > 0 ? "DOWN" : "_"),
+  //   mouse_data->hscroll < 0 ? "RIGHT" : (mouse_data->hscroll > 0 ? "LEFT" : "_")
+  // );
 }
 
 #ifdef USB_SOFTHOST_ENABLED
@@ -767,7 +815,8 @@ void next_keyboard_mouse_print_changes() {
     bool button2 = mouse_data&(1<<NEXT_KEYBOARD_MOUSE_BUTTON2_BIT);
     uint8_t dx = (mouse_data>>NEXT_KEYBOARD_MOUSE_X_START_BIT)&NEXT_KEYBOARD_BYTE_MASK;
     uint8_t dy = (mouse_data>>NEXT_KEYBOARD_MOUSE_Y_START_BIT)&NEXT_KEYBOARD_BYTE_MASK;
-    Dprintf("\nmouse_data on wire: L=%d R=%d dx=0x%x dy=0x%x mouse_data=0x%x \n", button1, button2, dx, dy, mouse_data); // FIXME: it's always printing after first click on button2, even when no change. why?
+    // FIXME: it's always printing after first click on button2, even when no change. why?
+    Dprintf("\nmouse_data on wire: L=%d R=%d dx=0x%x dy=0x%x mouse_data=0x%x \n", button1, button2, dx, dy, mouse_data);
   }
 }
 
@@ -786,8 +835,11 @@ enum {
   USB_IDLE,
   USB_INIT1,
   USB_INIT2,
+  USB_STATUS_CHANGE_COMMAND,
+  USB_DEVICE_CONNECTION_FRAME,
   USB_STATUS_REQ_FRAME,
   USB_VALID_FRAME,
+  USB_DEVICE_DISCONNECT_COMMAND,
   USB_VALID_FRAME_88,
   USB_FRAME_LENGTH,
   USB_FRAME_DATA,
@@ -814,21 +866,51 @@ void USBKMSerialOnReceiveCb() {
         break;
       case USB_INIT2:
         switch(c) {
+          case 0x80:
+            ev.type = USB_STATUS_CHANGE_COMMAND;
+            state = USB_STATUS_CHANGE_COMMAND;
+            break;
+          case 0x81:
+            ev.type = USB_DEVICE_CONNECTION_FRAME;
+            state = USB_DEVICE_CONNECTION_FRAME;
+            break;
           case 0x82:
             ev.type = USB_STATUS_REQ_FRAME;
             state = USB_STATUS_REQ_FRAME;
             break;
           case 0x83:
+            Serial.printf("\nWARNING: Received USB_VALID_FRAME\n");
             ev.type = USB_VALID_FRAME;
             state = USB_VALID_FRAME;
             break;
+          // case 0x86:
+          //   ev.type = USB_FINISH;
+          //   state = USB_FINISH;
+          //   break;
           case 0x88:
             ev.type = USB_VALID_FRAME_88;
             state = USB_VALID_FRAME_88;
             break;
+          default:
+            ev.type = USB_FINISH;
+            state = USB_FINISH;
+            Serial.printf("\nWARNING: Received 0x%x\n", c);
+            break;
         }
         break;
+      case USB_STATUS_CHANGE_COMMAND:
+        Serial.printf("\nWARNING: Received USB_STATUS_CHANGE_COMMAND 0x%x. Probable disconnect.\n", c);
+        state = USB_FINISH;
+        break;
+      case USB_DEVICE_CONNECTION_FRAME:
+        // 1-byte ID, 2-byte Payload length, Payload, 2-byte ID, 1-byte parity check
+        // TODO: read 5 bytes and save device IDs for each of the 2 ports. May need to handle disconnect aswell.
+        Serial.printf("\nWARNING: Received USB_DEVICE_CONNECTION_FRAME 0x%x\n", c);
+        state = USB_FINISH;
+        break;
       case USB_STATUS_REQ_FRAME:
+        // Serial.printf("\nUSB_STATUS_REQ_FRAME value=0x%x io_status=0x%x\n", c, c&0x0F);
+        Serial1.write("\x57\xAB\x12\x00\x00\x00\x00\xFF\x80\x00\x20", 11); // Specific Data Frame. Sending this disables STATUS_REQ_FRAME being sent by CH9350.
         state = USB_FINISH;
         break;
       case USB_VALID_FRAME:
@@ -867,6 +949,14 @@ void USBKMSerialOnReceiveCb() {
   }
 }
 
+void USBSerialLED(bool scroll_lock, bool caps_lock, bool num_lock) {
+  char buf[] = {0x57,0xAB,0x12,0x00,0x00,0x00,0x00,0x00,0x31,0x0F,0x20};
+#define USBSERIAL_CAPS 0x02
+#define USBSERIAL_NUML 0x01
+  buf[7] = scroll_lock<<2 | caps_lock<<1 | num_lock;
+  Serial1.write(buf, 11); // CH9350
+}
+
 void setup() {
 #ifdef RGB_ENABLED
   neopixel_init();
@@ -878,6 +968,8 @@ void setup() {
   // Serial for USB chip WCH CH9350
   Serial1.begin(115200, SERIAL_8N1, USB_SERIAL_RX, USB_SERIAL_TX);
   Serial1.onReceive(USBKMSerialOnReceiveCb);
+  // USBSerialLED(true, true, true);
+  USBSerialLED(true, true, false);
 
   // Setup POWER_ON pin
   poweron_init();
@@ -917,12 +1009,21 @@ void loop() {
     USBKMSerialEvent ev;
     USBKMSerialQueue.pop(&ev);
     if ((ev.labeling&0x30) == 0x10) {
-      usb_update_keys(&ev.data[2], ev.data[0]);
+      if ((ev.len-3) == 8) {
+        usb_update_keys(&ev.data[2], ev.data[0], 0);
+      } else if ((ev.len-3) == 10) {
+        // Apple Magic Keyboard 2: ev.data[0] is always 0x1. ev.data[9]: bit1=Eject bit2=Fn
+        usb_update_keys(&ev.data[3], ev.data[1], ev.data[9]);
+      } else {
+        Serial.printf("\nWARNING: Unknown keyboard data length=%d. data=0x%x %x %x %x %x %x %x %x %x %x\n", ev.len-3, ev.data[0], ev.data[1], ev.data[2], ev.data[3], ev.data[4], ev.data[5], ev.data[6], ev.data[7], ev.data[8], ev.data[9]);
+      }
     } else if ((ev.labeling&0x30) == 0x20) {
       if ((ev.len-3) == 4) {
         handle_mouse_data_4bytes(&ev.data[0]);
       } else if ((ev.len-3) == 6) {
         handle_mouse_data_6bytes(&ev.data[0]);
+      } else if ((ev.len-3) == 8) {
+        handle_mouse_data_8bytes(&ev.data[0]);
       } else if ((ev.len-3) == 10) {
         handle_mouse_data_10bytes(&ev.data[0]);
       } else {
@@ -939,7 +1040,7 @@ void loop() {
   static bool enable_key_enter = false;
 
   // next_mouse_print_changes();
-  // next_keyboard_mouse_print_changes();
+  next_keyboard_mouse_print_changes();
 
   if (c == 0 && Serial.available()) {
 #ifdef RGB_ENABLED
