@@ -21,6 +21,8 @@ hw_timer_t *next_mouse_timer;
   // #define RGB_ENABLED 1
   // #define USB_HOST_ENABLED 1 // Hardware USB Host
   // #define USB_SOFTHOST_ENABLED 1 // Software USB Host
+  #define USB_CH9350_ENABLED 1
+  #define USB_CH9350_SERIAL Serial1
 
   #define RGB_PIN 48
 
@@ -52,6 +54,8 @@ hw_timer_t *next_mouse_timer;
   #define USB_SERIAL_TX 10
 
 #elif defined(ARDUINO_ESP32_DEV)
+  #define USB_CH9350_ENABLED 1
+  #define USB_CH9350_SERIAL Serial1
 
   // This NeXT Keyboard Pins
   #define PIN_TO_KBD 32    // Input to this keyboard
@@ -758,7 +762,7 @@ int queue_keyboard(uint8_t key, bool pressed, uint8_t modifiers) { // TODO: turn
       _pressed | _key | // byte1
       _valid | _modifiers; // byte2
     keyboard_data_ready = true;
-    Serial.printf("\npressed=0x%x, key=0x%x, valid=0x%x, modifiers=0x%x, byte1=0x%x byte2=0x%x\n",
+    Dprintf("\npressed=0x%x, key=0x%x, valid=0x%x, modifiers=0x%x, byte1=0x%x byte2=0x%x\n",
       _pressed>>NEXT_KEYBOARD_KEY_PRESSED_BIT,
       _key>>NEXT_KEYBOARD_KEY_START_BIT,
       _valid>>NEXT_KEYBOARD_VALID_BIT,
@@ -820,6 +824,7 @@ void next_keyboard_mouse_print_changes() {
   }
 }
 
+#ifdef USB_CH9350_ENABLED
 typedef struct {
   uint8_t type;
   uint8_t len;
@@ -849,12 +854,19 @@ enum {
 };
 
 void USBKMSerialOnReceiveCb() {
+  static bool locked = false;
   static int state = USB_IDLE;
   static uint8_t len_left = 0;
   USBKMSerialEvent ev;
 
-  while(Serial1.available() && state != USB_FINISH) {
-    char c = Serial1.read();
+  if (locked) {
+    Dprintf("\nWARNING: USBKMSerialOnReceiveCb already running\n");
+    return;
+  }
+
+  locked = true;
+  while(USB_CH9350_SERIAL.available() && state != USB_FINISH) {
+    char c = USB_CH9350_SERIAL.read();
     switch (state) {
       case USB_IDLE:
         if (c == 0x57)
@@ -863,6 +875,8 @@ void USBKMSerialOnReceiveCb() {
       case USB_INIT1:
         if (c == 0xAB)
           state = USB_INIT2;
+        else
+          Dprintf("\nUSB_INIT1: Ignoring c=0x%x\n", c);
         break;
       case USB_INIT2:
         switch(c) {
@@ -894,7 +908,7 @@ void USBKMSerialOnReceiveCb() {
           default:
             ev.type = USB_FINISH;
             state = USB_FINISH;
-            Serial.printf("\nWARNING: Received 0x%x\n", c);
+            Serial.printf("\nWARNING: USB_INIT2 Received 0x%x\n", c);
             break;
         }
         break;
@@ -910,7 +924,7 @@ void USBKMSerialOnReceiveCb() {
         break;
       case USB_STATUS_REQ_FRAME:
         // Serial.printf("\nUSB_STATUS_REQ_FRAME value=0x%x io_status=0x%x\n", c, c&0x0F);
-        Serial1.write("\x57\xAB\x12\x00\x00\x00\x00\xFF\x80\x00\x20", 11); // Specific Data Frame. Sending this disables STATUS_REQ_FRAME being sent by CH9350.
+        USB_CH9350_SERIAL.write("\x57\xAB\x12\x00\x00\x00\x00\xFF\x80\x00\x20", 11); // Specific Data Frame. Sending this disables STATUS_REQ_FRAME being sent by CH9350.
         state = USB_FINISH;
         break;
       case USB_VALID_FRAME:
@@ -947,6 +961,8 @@ void USBKMSerialOnReceiveCb() {
   if (state == USB_FINISH) {
     state = USB_IDLE;
   }
+
+  locked = false;
 }
 
 void USBSerialLED(bool scroll_lock, bool caps_lock, bool num_lock) {
@@ -954,8 +970,9 @@ void USBSerialLED(bool scroll_lock, bool caps_lock, bool num_lock) {
 #define USBSERIAL_CAPS 0x02
 #define USBSERIAL_NUML 0x01
   buf[7] = scroll_lock<<2 | caps_lock<<1 | num_lock;
-  Serial1.write(buf, 11); // CH9350
+  USB_CH9350_SERIAL.write(buf, 11); // CH9350
 }
+#endif // USB_CH9350_ENABLED
 
 void setup() {
 #ifdef RGB_ENABLED
@@ -965,11 +982,13 @@ void setup() {
   Serial.begin(115200);
   Serial.printf("Starting NeXT Keyboard\n");
 
+#ifdef USB_CH9350_ENABLED
   // Serial for USB chip WCH CH9350
-  Serial1.begin(115200, SERIAL_8N1, USB_SERIAL_RX, USB_SERIAL_TX);
-  Serial1.onReceive(USBKMSerialOnReceiveCb);
+  USB_CH9350_SERIAL.begin(115200, SERIAL_8N1, USB_SERIAL_RX, USB_SERIAL_TX);
+  USB_CH9350_SERIAL.onReceive(USBKMSerialOnReceiveCb);
   // USBSerialLED(true, true, true);
   USBSerialLED(true, true, false);
+#endif // USB_CH9350_ENABLED
 
   // Setup POWER_ON pin
   poweron_init();
@@ -1005,12 +1024,18 @@ void loop() {
   usbHost.task();
 #endif
 
+#ifdef USB_CH9350_ENABLED
+
+  if (USB_CH9350_SERIAL.available())
+    USBKMSerialOnReceiveCb();
+
   while (!USBKMSerialQueue.isEmpty()) {
     USBKMSerialEvent ev;
     USBKMSerialQueue.pop(&ev);
     if ((ev.labeling&0x30) == 0x10) {
       if ((ev.len-3) == 8) {
         usb_update_keys(&ev.data[2], ev.data[0], 0);
+        Dprintf("\nDEBUG: keyboard data length=%d. data=0x%x %x %x %x %x %x %x %x %x %x\n", ev.len-3, ev.data[0], ev.data[1], ev.data[2], ev.data[3], ev.data[4], ev.data[5], ev.data[6], ev.data[7], ev.data[8], ev.data[9]);
       } else if ((ev.len-3) == 10) {
         // Apple Magic Keyboard 2: ev.data[0] is always 0x1. ev.data[9]: bit1=Eject bit2=Fn
         usb_update_keys(&ev.data[3], ev.data[1], ev.data[9]);
@@ -1033,9 +1058,12 @@ void loop() {
       Serial.printf("\nWARNING: multimedia keyboard\n");
     } else if ((ev.labeling&0x30) == 0x00) {
       Serial.printf("\nWARNING: other USB device\n");
+    } else {
+      Serial.printf("\nWARNING: unexpected USB device\n");
     }
     // Serial.printf("\nlen=%d data_len=%d labeling=0x%x data=0x%x %x %x %x %x %x %x %x serial=%d checksum=0x%x\n", ev.len, ev.len-3, ev.labeling&0x30, ev.data[0], ev.data[1], ev.data[2], ev.data[3], ev.data[4], ev.data[5], ev.data[6], ev.data[7], ev.serial, ev.checksum);
   }
+#endif // USB_CH9350_ENABLED
 
   static bool enable_key_enter = false;
 
