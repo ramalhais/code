@@ -873,10 +873,12 @@ void USBKMSerialOnReceiveCb() {
           state = USB_INIT1;
         break;
       case USB_INIT1:
-        if (c == 0xAB)
+        if (c == 0xAB) {
           state = USB_INIT2;
-        else
+        } else {
+          state = USB_FINISH;
           Dprintf("\nUSB_INIT1: Ignoring c=0x%x\n", c);
+        }
         break;
       case USB_INIT2:
         switch(c) {
@@ -906,7 +908,6 @@ void USBKMSerialOnReceiveCb() {
             state = USB_VALID_FRAME_88;
             break;
           default:
-            ev.type = USB_FINISH;
             state = USB_FINISH;
             Serial.printf("\nWARNING: USB_INIT2 Received 0x%x\n", c);
             break;
@@ -967,10 +968,11 @@ void USBKMSerialOnReceiveCb() {
 
 void USBSerialLED(bool scroll_lock, bool caps_lock, bool num_lock) {
   char buf[] = {0x57,0xAB,0x12,0x00,0x00,0x00,0x00,0x00,0x31,0x0F,0x20};
-#define USBSERIAL_CAPS 0x02
-#define USBSERIAL_NUML 0x01
-  buf[7] = scroll_lock<<2 | caps_lock<<1 | num_lock;
-  USB_CH9350_SERIAL.write(buf, 11); // CH9350
+#define USBSERIAL_NUM_LOCK_BIT    0
+#define USBSERIAL_CAPS_LOCK_BIT   1
+#define USBSERIAL_SCROLL_LOCK_BIT 2
+  buf[7] = scroll_lock<<USBSERIAL_SCROLL_LOCK_BIT | caps_lock<<USBSERIAL_CAPS_LOCK_BIT | num_lock<<USBSERIAL_NUM_LOCK_BIT;
+  USB_CH9350_SERIAL.write(buf, 11);
 }
 #endif // USB_CH9350_ENABLED
 
